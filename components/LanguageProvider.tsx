@@ -1,3 +1,44 @@
+// "use client";
+
+// import { createContext, useContext, useEffect, useMemo, useState } from "react";
+// import { AppLanguage, LANGUAGE_STORAGE_KEY } from "@/lib/language";
+
+// type LanguageContextValue = {
+//   language: AppLanguage;
+//   setLanguage: (language: AppLanguage) => void;
+// };
+
+// const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
+
+// export function LanguageProvider({ children }: { children: React.ReactNode }) {
+//   const [language, setLanguageState] = useState<AppLanguage>("English");
+
+//   useEffect(() => {
+//     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+//     if (stored === "English" || stored === "Hindi" || stored === "Marathi") {
+//       setLanguageState(stored);
+//     }
+//   }, []);
+
+//   const setLanguage = (nextLanguage: AppLanguage) => {
+//     setLanguageState(nextLanguage);
+//     window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+//   };
+
+//   const value = useMemo(() => ({ language, setLanguage }), [language]);
+
+//   return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+// }
+
+// export function useLanguage() {
+//   const context = useContext(LanguageContext);
+//   if (!context) {
+//     throw new Error("useLanguage must be used within LanguageProvider");
+//   }
+//   return context;
+// }
+
+
 "use client";
 
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
@@ -10,13 +51,14 @@ type LanguageContextValue = {
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
-export function LanguageProvider({ children }: { children: React.ReactNode }) {
+// DHAYAN DEIN: Yahan 'export default' hona chahiye
+export default function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>("English");
 
   useEffect(() => {
     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored === "English" || stored === "Hindi" || stored === "Marathi") {
-      setLanguageState(stored);
+      setLanguageState(stored as AppLanguage);
     }
   }, []);
 
@@ -32,8 +74,6 @@ export function LanguageProvider({ children }: { children: React.ReactNode }) {
 
 export function useLanguage() {
   const context = useContext(LanguageContext);
-  if (!context) {
-    throw new Error("useLanguage must be used within LanguageProvider");
-  }
+  if (!context) throw new Error("useLanguage must be used within LanguageProvider");
   return context;
 }

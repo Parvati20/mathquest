@@ -112,3 +112,58 @@ body {
     opacity: 0;
   }
 }
+
+@keyframes floatDrift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(3deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+}
+
+.animate-float {
+  animation: floatDrift 7s ease-in-out infinite;
+}
+
+@keyframes submitPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.34);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(233, 30, 99, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0);
+  }
+}
+
+.animate-submit-pulse {
+  animation: submitPulse 1.8s ease-out infinite;
+}
+
+@keyframes shakeHorizontal {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-shake {
+  animation: shakeHorizontal 350ms ease-in-out;
+}
