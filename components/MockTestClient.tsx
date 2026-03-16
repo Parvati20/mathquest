@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import LanguageSelect from "@/components/LanguageSelect";
 import { useLanguage } from "@/components/LanguageProvider";
 import {
@@ -117,6 +118,8 @@ export default function MockTestClient() {
     Array(MOCK_QUESTION_COUNT).fill(null),
   );
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [burstTick, setBurstTick] = useState(0);
   const [timeLeft, setTimeLeft] = useState(MOCK_DURATION_SECONDS);
   const [finished, setFinished] = useState(false);
   const [resultAnimated, setResultAnimated] = useState(false);
@@ -162,7 +165,7 @@ export default function MockTestClient() {
     return () => window.clearTimeout(timeout);
   }, [finished]);
 
-  const submitCurrentAndNext = () => {
+  const submitCurrent = () => {
     if (selectedIndex === null) {
       return;
     }
@@ -171,6 +174,18 @@ export default function MockTestClient() {
     nextAnswers[currentIndex] = selectedIndex;
     setAnswers(nextAnswers);
 
+    if (selectedIndex === currentQuestion?.answerIndex) {
+      setBurstTick((prev) => prev + 1);
+    }
+
+    setSubmitted(true);
+  };
+
+  const goToNextQuestion = () => {
+    if (!submitted) {
+      return;
+    }
+
     if (currentIndex === questions.length - 1) {
       setFinished(true);
       return;
@@ -178,6 +193,7 @@ export default function MockTestClient() {
 
     setCurrentIndex((prev) => prev + 1);
     setSelectedIndex(null);
+    setSubmitted(false);
   };
 
   const startNewMock = () => {
@@ -186,6 +202,8 @@ export default function MockTestClient() {
     setCurrentIndex(0);
     setAnswers(Array(MOCK_QUESTION_COUNT).fill(null));
     setSelectedIndex(null);
+    setSubmitted(false);
+    setBurstTick(0);
     setTimeLeft(MOCK_DURATION_SECONDS);
     setFinished(false);
   };
@@ -199,6 +217,8 @@ export default function MockTestClient() {
   const accuracy = Math.round((correctCount / questions.length) * 100);
   const score = correctCount * MARKS_PER_QUESTION;
   const maxScore = questions.length * MARKS_PER_QUESTION;
+  const selectedAnswerCorrect =
+    submitted && currentQuestion ? selectedIndex === currentQuestion.answerIndex : false;
 
   useEffect(() => {
     if (!finished || savedRef.current) return;
@@ -251,7 +271,7 @@ export default function MockTestClient() {
         </div>
 
         <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-8 py-4 backdrop-blur-md">
-          <span className="font-bold text-gray-700">{text.appName}</span>
+          <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
           <Link
             href="/tool"
             className="text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
@@ -419,7 +439,7 @@ export default function MockTestClient() {
       </div>
 
       <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-8 py-4 backdrop-blur-md">
-        <span className="font-bold text-gray-700">{text.appName}</span>
+        <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
         <div className="flex items-center gap-3">
           <LanguageSelect className="bg-white" />
           <div className="rounded-full border border-[#E91E63]/15 bg-gradient-to-r from-[#E91E63]/12 to-[#FF8A65]/12 px-4 py-1.5 text-sm font-black text-[#E91E63] shadow-[0_0_22px_rgba(233,30,99,0.12)]">
@@ -448,35 +468,99 @@ export default function MockTestClient() {
         </div>
 
         <article className="mt-6 rounded-[2rem] border border-white/70 bg-white/72 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.05)] backdrop-blur-md">
+          {submitted && selectedAnswerCorrect ? (
+            <div key={burstTick} className="pointer-events-none absolute inset-x-0 top-24 z-20 h-40 overflow-visible">
+              <span className="firework firework-a" />
+              <span className="firework firework-b" />
+              <span className="firework firework-c" />
+              <span className="firework firework-d" />
+              <span className="firework firework-e" />
+              <span className="firework firework-f" />
+              <span className="firework firework-g" />
+              <span className="firework firework-h" />
+              <span className="confetti mega-confetti-1" />
+              <span className="confetti mega-confetti-2" />
+              <span className="confetti mega-confetti-3" />
+              <span className="confetti mega-confetti-4" />
+              <span className="confetti mega-confetti-5" />
+              <span className="confetti mega-confetti-6" />
+            </div>
+          ) : null}
+
           <h2 className="text-3xl font-black leading-tight text-gray-800">
             {localizedCurrentQuestion?.question}
           </h2>
+
+          {submitted ? (
+            <div
+              className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-bold shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
+                selectedAnswerCorrect
+                  ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                  : "border-rose-200 bg-rose-50 text-rose-700"
+              }`}
+            >
+              <span>
+                {selectedAnswerCorrect ? text.correct : text.wrong}
+              </span>
+              {!selectedAnswerCorrect && currentQuestion ? (
+                <span className="ml-2 text-rose-500">
+                  {text.correctAnswer}: {localizedCurrentQuestion?.options?.[currentQuestion.answerIndex]}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
 
           <div className="mt-6 space-y-3">
             {localizedCurrentQuestion?.options.map((option, optionIndex) => {
               const letter = String.fromCharCode(65 + optionIndex);
               const picked = selectedIndex === optionIndex;
+              const isAnswer = currentQuestion?.answerIndex === optionIndex;
+              const isWrongPick = submitted && picked && !isAnswer;
+              const isCorrectAnswer = submitted && isAnswer;
 
               return (
                 <button
                   key={letter}
-                  onClick={() => setSelectedIndex(optionIndex)}
+                  onClick={() => {
+                    if (!submitted) {
+                      setSelectedIndex(optionIndex);
+                    }
+                  }}
                   className={`flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
-                    picked
-                      ? "border-[#E91E63]/35 bg-[#fff1f6] shadow-[0_12px_24px_rgba(233,30,99,0.10)]"
-                      : "border-white/70 bg-white/75 hover:-translate-y-1 hover:border-[#E91E63]/25 hover:bg-[#fff7fa] hover:shadow-[0_14px_30px_rgba(233,30,99,0.08)]"
+                    isCorrectAnswer
+                      ? "border-emerald-300 bg-emerald-50 shadow-[0_12px_24px_rgba(16,185,129,0.14)]"
+                      : isWrongPick
+                        ? "border-rose-300 bg-rose-50 shadow-[0_12px_24px_rgba(244,63,94,0.12)]"
+                        : picked
+                          ? "border-[#E91E63]/35 bg-[#fff1f6] shadow-[0_12px_24px_rgba(233,30,99,0.10)]"
+                          : "border-white/70 bg-white/75 hover:-translate-y-1 hover:border-[#E91E63]/25 hover:bg-[#fff7fa] hover:shadow-[0_14px_30px_rgba(233,30,99,0.08)]"
                   }`}
+                  disabled={submitted}
                 >
                   <span
                     className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white shadow-[0_12px_24px_rgba(15,23,42,0.10)] ${
-                      picked
-                        ? "bg-gradient-to-br from-[#E91E63] to-[#FF8A65]"
-                        : "bg-gradient-to-br from-slate-400 to-slate-500"
+                      isCorrectAnswer
+                        ? "bg-gradient-to-br from-emerald-500 to-lime-500"
+                        : isWrongPick
+                          ? "bg-gradient-to-br from-rose-500 to-orange-500"
+                          : picked
+                            ? "bg-gradient-to-br from-[#E91E63] to-[#FF8A65]"
+                            : "bg-gradient-to-br from-slate-400 to-slate-500"
                     }`}
                   >
                     {letter}
                   </span>
                   <span className="text-gray-700">{option}</span>
+                  {submitted && isCorrectAnswer ? (
+                    <span className="ml-auto rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                      {text.correct}
+                    </span>
+                  ) : null}
+                  {isWrongPick ? (
+                    <span className="ml-auto rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-rose-700">
+                      {text.wrong}
+                    </span>
+                  ) : null}
                 </button>
               );
             })}
@@ -485,13 +569,15 @@ export default function MockTestClient() {
 
         <div className="mt-5 flex justify-end">
           <button
-            onClick={submitCurrentAndNext}
-            disabled={selectedIndex === null}
+            onClick={submitted ? goToNextQuestion : submitCurrent}
+            disabled={selectedIndex === null && !submitted}
             className="rounded-xl bg-orange-500 px-8 py-3 font-bold text-white transition-all enabled:hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
           >
-            {currentIndex === questions.length - 1
-              ? text.submitTest
-              : text.next}
+            {submitted
+              ? currentIndex === questions.length - 1
+                ? text.submitTest
+                : text.next
+              : text.submit}
           </button>
         </div>
       </section>

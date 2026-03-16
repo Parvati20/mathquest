@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import BrandLogo from "@/components/BrandLogo";
 import LanguageSelect from "@/components/LanguageSelect";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalizedDifficultyLabel, getLocalizedQuestion, getLocalizedTopicContent, getUiText } from "@/lib/language";
@@ -265,7 +266,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
     return (
       <main className="min-h-screen bg-[#FFFBF5] font-sans">
         <nav className="flex items-center justify-between border-b border-gray-100 bg-white/80 px-6 py-3 backdrop-blur-md">
-          <span className="font-bold text-gray-700">{text.appName}</span>
+          <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
           <Link href={`/${topic}`} className="text-sm font-semibold text-orange-500 hover:text-orange-600">
             {text.learnConcept}
           </Link>
@@ -350,7 +351,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
       </div>
 
       <nav className="relative flex items-center justify-between border-b border-white/10 bg-[#0F172A]/65 px-6 py-4 backdrop-blur-xl">
-        <span className="font-bold text-white/90">{text.appName}</span>
+        <BrandLogo textClassName="text-[1.15rem] tracking-wide" secondaryClassName="text-white" />
         <Link href={`/${topic}`} className="text-sm font-semibold text-[#ff9cbc] hover:text-white">
           {text.learnConcept}
         </Link>

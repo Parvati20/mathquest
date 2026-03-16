@@ -6,6 +6,7 @@ import { signOut } from "next-auth/react";
 import type { Session } from "next-auth";
 import { useMemo } from "react";
 import { useLanguage } from "@/components/LanguageProvider";
+import BrandLogo from "@/components/BrandLogo";
 import type { AppLanguage } from "@/lib/language";
 
 type Props = {
@@ -24,7 +25,6 @@ const LANG_OPTIONS: { value: AppLanguage; label: string }[] = [
   { value: "Marathi", label: "म" },
 ];
 
-// ── INLINE SVG ICONS ──
 const HomeIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
     <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -114,10 +114,11 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
             M
           </div>
           <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-[#E91E63] font-black text-sm leading-none">nav</span>
-              <span className={`${dark ? "text-white" : "text-slate-900"} font-black text-sm leading-none`}>gurukul</span>
-            </div>
+            <BrandLogo
+              className="leading-none"
+              textClassName="text-[1.05rem] tracking-wide"
+              secondaryClassName={dark ? "text-white" : "text-slate-900"}
+            />
             <span className={`${dark ? "text-white/30" : "text-slate-400"} text-[9px] font-semibold uppercase tracking-[0.2em]`}>Math AI</span>
           </div>
         </Link>

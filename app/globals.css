@@ -167,3 +167,113 @@ body {
 .animate-shake {
   animation: shakeHorizontal 350ms ease-in-out;
 }
+
+@keyframes fireworkBurst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.15);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.firework {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: fireworkBurst 900ms ease-out forwards;
+  box-shadow:
+    0 -56px 0 -6px currentColor,
+    40px -40px 0 -6px currentColor,
+    56px 0 0 -6px currentColor,
+    40px 40px 0 -6px currentColor,
+    0 56px 0 -6px currentColor,
+    -40px 40px 0 -6px currentColor,
+    -56px 0 0 -6px currentColor,
+    -40px -40px 0 -6px currentColor,
+    0 -84px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    60px -60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    84px 0 0 -10px color-mix(in srgb, currentColor 80%, white),
+    60px 60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    0 84px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -60px 60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -84px 0 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -60px -60px 0 -10px color-mix(in srgb, currentColor 80%, white);
+}
+
+.firework-a {
+  top: 18%;
+  left: 18%;
+  color: #ec4899;
+}
+
+.firework-b {
+  top: 10%;
+  left: 50%;
+  color: #f97316;
+  animation-delay: 80ms;
+}
+
+.firework-c {
+  top: 18%;
+  left: 82%;
+  color: #22c55e;
+  animation-delay: 160ms;
+}
+
+.firework-d {
+  top: 40%;
+  left: 28%;
+  color: #3b82f6;
+  animation-delay: 220ms;
+}
+
+.firework-e {
+  top: 42%;
+  left: 72%;
+  color: #eab308;
+  animation-delay: 280ms;
+}
+
+.firework-f {
+  top: 62%;
+  left: 14%;
+  color: #8b5cf6;
+  animation-delay: 140ms;
+}
+
+.firework-g {
+  top: 62%;
+  left: 50%;
+  color: #14b8a6;
+  animation-delay: 320ms;
+}
+
+.firework-h {
+  top: 62%;
+  left: 86%;
+  color: #fb7185;
+  animation-delay: 380ms;
+}
+
+
+
+@font-face {
+  font-family: 'Samarkan';
+  src: url('/fonts/Samarkan.ttf') format('truetype'); /* Check karein folder name 'fonts' hai ya direct 'public' mein hai */
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-samarkan {
+  font-family: 'Samarkan', cursive;
+}
