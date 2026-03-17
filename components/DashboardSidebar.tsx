@@ -101,7 +101,7 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
   ];
 
   return (
-    <aside className={`fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r backdrop-blur-xl ${dark ? "border-white/10 bg-[#0F172A] shadow-[18px_0_60px_rgba(15,23,42,0.38)]" : "border-gray-100 bg-white/78 shadow-[18px_0_50px_rgba(15,23,42,0.06)]"}`}>
+    <aside className={`hidden lg:flex fixed left-0 top-0 z-50 h-screen w-[260px] flex-col border-r backdrop-blur-xl ${dark ? "border-white/10 bg-[#0F172A] shadow-[18px_0_60px_rgba(15,23,42,0.38)]" : "border-gray-100 bg-white/78 shadow-[18px_0_50px_rgba(15,23,42,0.06)]"}` }>
 
       <div className={`pointer-events-none absolute inset-y-0 right-0 w-px ${dark ? "bg-white/10" : "bg-gray-100"}`} />
       <div className="pointer-events-none absolute right-[-40px] top-20 h-48 w-48 rounded-full bg-[#E91E63]/10 blur-3xl" />

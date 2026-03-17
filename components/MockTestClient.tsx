@@ -270,17 +270,17 @@ export default function MockTestClient() {
           <div className="absolute right-[-8%] top-[10%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,_rgba(59,130,246,0.08)_0%,_rgba(59,130,246,0.02)_45%,_transparent_74%)] blur-3xl" />
         </div>
 
-        <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-8 py-4 backdrop-blur-md">
+        <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
           <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
           <Link
             href="/tool"
-            className="text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
+            className="text-xs sm:text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
           >
             {text.backToTopics}
           </Link>
         </nav>
 
-        <section className="relative mx-auto max-w-5xl px-6 py-10">
+        <section className="relative mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">
           <div className="pointer-events-none absolute inset-x-6 top-10 h-44 rounded-[2rem] bg-[radial-gradient(circle,_rgba(233,30,99,0.14)_0%,_rgba(233,30,99,0.03)_55%,_transparent_72%)]" />
           <div className="pointer-events-none absolute inset-x-6 top-0 overflow-hidden rounded-3xl">
             <span className="confetti mega-confetti-1" />
@@ -291,13 +291,13 @@ export default function MockTestClient() {
             <span className="confetti mega-confetti-6" />
           </div>
 
-          <div className="relative rounded-[2rem] border border-white/70 bg-white/70 p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+          <div className="relative rounded-[2rem] border border-white/70 bg-white/70 p-6 sm:p-8 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
             <div className="text-center">
               <p className="text-5xl">🏆</p>
-              <h1 className="mt-3 text-4xl font-black tracking-tight text-gray-900">
+              <h1 className="mt-3 text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-gray-900">
                 {perfect ? text.fullMarks : text.testComplete}
               </h1>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-gray-500">
+              <p className="mx-auto mt-2 max-w-xl text-xs sm:text-sm text-gray-500">
                 {perfect ? text.perfectBody : text.retryBody}
               </p>
             </div>
@@ -319,25 +319,25 @@ export default function MockTestClient() {
               />
             </div>
 
-            <div className="mx-auto mt-4 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/90 p-4 shadow-[0_0_20px_rgba(16,185,129,0.16)]">
-                <p className="text-sm font-bold text-emerald-700">
+            <div className="mx-auto mt-4 grid max-w-3xl grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="rounded-2xl border border-emerald-200/70 bg-emerald-50/90 p-3 sm:p-4">
+                <p className="text-xs sm:text-sm font-bold text-emerald-700">
                   {text.correct}
                 </p>
-                <p className="mt-1 text-3xl font-black text-emerald-700">
+                <p className="mt-1 text-2xl sm:text-3xl font-black text-emerald-700">
                   {correctCount}
                 </p>
               </div>
-              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 p-4 shadow-[0_0_20px_rgba(244,63,94,0.16)]">
-                <p className="text-sm font-bold text-rose-700">{text.wrong}</p>
-                <p className="mt-1 text-3xl font-black text-rose-700">
+              <div className="rounded-2xl border border-rose-200/80 bg-rose-50/90 p-3 sm:p-4">
+                <p className="text-xs sm:text-sm font-bold text-rose-700">{text.wrong}</p>
+                <p className="mt-1 text-2xl sm:text-3xl font-black text-rose-700">
                   {wrongCount}
                 </p>
               </div>
             </div>
 
-            <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-white/80 bg-white/80 p-4 text-left shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
-              <p className="text-sm font-bold text-gray-700">
+            <div className="mx-auto mt-6 max-w-3xl rounded-2xl border border-white/80 bg-white/80 p-4 sm:p-5 text-left">
+              <p className="text-xs sm:text-sm font-bold text-gray-700">
                 {text.weakTopics}
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -345,19 +345,19 @@ export default function MockTestClient() {
                   weakTopics.map((topic) => (
                     <div
                       key={topic.id}
-                      className="flex items-center gap-2 rounded-full border border-[#E91E63]/20 bg-[#fff1f6] px-3 py-1 text-xs font-bold text-[#E91E63]"
+                      className="flex items-center gap-2 rounded-full border border-[#E91E63]/20 bg-[#fff1f6] px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-bold text-[#E91E63]"
                     >
                       <span>{topic.title}</span>
                       <Link
                         href={`/${topic.id}`}
-                        className="rounded-full border border-[#E91E63]/30 bg-white px-2 py-0.5 text-[10px] font-black text-[#E91E63] hover:bg-[#E91E63] hover:text-white"
+                        className="rounded-full border border-[#E91E63]/30 bg-white px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black text-[#E91E63] hover:bg-[#E91E63] hover:text-white"
                       >
                         Review Now
                       </Link>
                     </div>
                   ))
                 ) : (
-                  <span className="text-sm text-emerald-600">
+                  <span className="text-xs sm:text-sm text-emerald-600">
                     {text.noWeakTopic}
                   </span>
                 )}
@@ -369,13 +369,13 @@ export default function MockTestClient() {
                 {wrongAttempts.map((item) => (
                   <div
                     key={item.question.id}
-                    className="rounded-2xl border border-white/80 bg-white p-4 shadow-[0_8px_26px_rgba(15,23,42,0.05)]"
+                    className="rounded-2xl border border-white/80 bg-white p-3 sm:p-4"
                   >
-                    <div className="mb-2 flex items-center justify-between gap-3">
-                      <span className="inline-flex rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-rose-600 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]">
+                    <div className="mb-2 flex items-center justify-between gap-2 sm:gap-3 flex-wrap">
+                      <span className="inline-flex rounded-full bg-rose-100 px-2 sm:px-2.5 py-1 text-[9px] sm:text-[10px] font-black uppercase tracking-[0.14em] text-rose-600">
                         Incorrect
                       </span>
-                      <span className="text-[11px] font-semibold text-slate-400">
+                      <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400">
                         {
                           getLocalizedTopicContent(
                             item.question.topic as keyof typeof topicsData,
@@ -384,11 +384,11 @@ export default function MockTestClient() {
                         }
                       </span>
                     </div>
-                    <p className="text-sm font-bold text-slate-700">
+                    <p className="text-xs sm:text-sm font-bold text-slate-700">
                       {item?.question &&
                         getLocalizedQuestion(item.question, language)?.question}
                     </p>
-                    <p className="mt-1 text-xs text-rose-500">
+                    <p className="mt-1 text-[11px] sm:text-xs text-rose-500">
                       {text.correctAnswer}:{" "}
                       {item?.question?.options?.[item?.question?.answerIndex]}
                     </p>
@@ -397,16 +397,16 @@ export default function MockTestClient() {
               </div>
             ) : null}
 
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-              <Link
-                href="/tool"
-                className="rounded-xl border border-[#E91E63]/35 bg-white/35 px-5 py-3 text-sm font-bold text-[#E91E63] backdrop-blur-md transition-colors hover:bg-[#E91E63]/10"
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+            <Link
+              href="/tool"
+              className="rounded-xl border border-[#E91E63]/35 bg-white/35 px-4 sm:px-5 py-2 sm:py-3 text-xs sm:text-sm font-bold text-[#E91E63] backdrop-blur-md transition-colors hover:bg-[#E91E63]/10"
               >
                 {text.backToTopics}
               </Link>
               <button
                 onClick={startNewMock}
-                className="rounded-xl bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#FF8A65] px-6 py-3 text-sm font-black text-white shadow-[0_16px_34px_rgba(233,30,99,0.26)] transition-transform hover:scale-105"
+              className="rounded-xl bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#FF8A65] px-5 sm:px-6 py-2 sm:py-3 text-xs sm:text-sm font-black text-white shadow-[0_16px_34px_rgba(233,30,99,0.26)] transition-transform hover:scale-105"
               >
                 {text.tryAgain}
               </button>
@@ -438,27 +438,27 @@ export default function MockTestClient() {
         </span>
       </div>
 
-      <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-8 py-4 backdrop-blur-md">
+      <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md flex-wrap gap-2">
         <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
-        <div className="flex items-center gap-3">
-          <LanguageSelect className="bg-white" />
-          <div className="rounded-full border border-[#E91E63]/15 bg-gradient-to-r from-[#E91E63]/12 to-[#FF8A65]/12 px-4 py-1.5 text-sm font-black text-[#E91E63] shadow-[0_0_22px_rgba(233,30,99,0.12)]">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <LanguageSelect className="bg-white text-xs sm:text-sm" />
+          <div className="rounded-full border border-[#E91E63]/15 bg-gradient-to-r from-[#E91E63]/12 to-[#FF8A65]/12 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm font-black text-[#E91E63]">
             ⏰ {formatTimer(timeLeft)}
           </div>
         </div>
       </nav>
 
       <section className="relative mx-auto max-w-3xl px-6 py-10">
-        <div className="flex items-center justify-between text-sm text-gray-600">
+        <div className="flex items-center justify-between text-xs sm:text-sm text-gray-600 w-full gap-2">
           <span>
             {text.question} {currentIndex + 1}/{questions.length}
           </span>
-          <span className="rounded-full border border-[#E91E63]/15 bg-white/80 px-3 py-1 text-xs font-bold text-[#E91E63] shadow-[0_10px_20px_rgba(233,30,99,0.08)]">
+          <span className="rounded-full border border-[#E91E63]/15 bg-white/80 px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold text-[#E91E63]">
             15:00 {text.timerRunning}
           </span>
         </div>
 
-        <div className="mt-3 h-4 w-full rounded-full bg-white/80 p-1 shadow-inner shadow-slate-200/60">
+        <div className="mt-3 h-3 sm:h-4 w-full rounded-full bg-white/80 p-0.5 sm:p-1">
           <div
             className="h-full rounded-full bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#FF8A65] shadow-[0_0_20px_rgba(233,30,99,0.18)] transition-all"
             style={{
@@ -467,7 +467,7 @@ export default function MockTestClient() {
           />
         </div>
 
-        <article className="mt-6 rounded-[2rem] border border-white/70 bg-white/72 p-6 shadow-[0_18px_50px_rgba(15,23,42,0.05)] backdrop-blur-md">
+        <article className="mt-6 rounded-[2rem] border border-white/70 bg-white/72 p-4 sm:p-6 backdrop-blur-md">
           {submitted && selectedAnswerCorrect ? (
             <div key={burstTick} className="pointer-events-none absolute inset-x-0 top-24 z-20 h-40 overflow-visible">
               <span className="firework firework-a" />
@@ -487,13 +487,13 @@ export default function MockTestClient() {
             </div>
           ) : null}
 
-          <h2 className="text-3xl font-black leading-tight text-gray-800">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight text-gray-800">
             {localizedCurrentQuestion?.question}
           </h2>
 
           {submitted ? (
             <div
-              className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-bold shadow-[0_10px_24px_rgba(15,23,42,0.05)] ${
+              className={`mt-4 rounded-2xl border px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-bold ${
                 selectedAnswerCorrect
                   ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                   : "border-rose-200 bg-rose-50 text-rose-700"
@@ -526,7 +526,7 @@ export default function MockTestClient() {
                       setSelectedIndex(optionIndex);
                     }
                   }}
-                  className={`flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                  className={`flex w-full items-center gap-3 sm:gap-4 rounded-2xl border px-3 sm:px-4 py-3 sm:py-4 text-left transition-all duration-200 text-sm ${
                     isCorrectAnswer
                       ? "border-emerald-300 bg-emerald-50 shadow-[0_12px_24px_rgba(16,185,129,0.14)]"
                       : isWrongPick
@@ -538,7 +538,7 @@ export default function MockTestClient() {
                   disabled={submitted}
                 >
                   <span
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-black text-white shadow-[0_12px_24px_rgba(15,23,42,0.10)] ${
+                    className={`inline-flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full text-xs sm:text-sm font-black text-white shadow-[0_12px_24px_rgba(15,23,42,0.10)] flex-shrink-0 ${
                       isCorrectAnswer
                         ? "bg-gradient-to-br from-emerald-500 to-lime-500"
                         : isWrongPick
@@ -552,12 +552,12 @@ export default function MockTestClient() {
                   </span>
                   <span className="text-gray-700">{option}</span>
                   {submitted && isCorrectAnswer ? (
-                    <span className="ml-auto rounded-full bg-emerald-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-700">
+                    <span className="ml-auto rounded-full bg-emerald-100 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase text-emerald-700">
                       {text.correct}
                     </span>
                   ) : null}
                   {isWrongPick ? (
-                    <span className="ml-auto rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-rose-700">
+                    <span className="ml-auto rounded-full bg-rose-100 px-2 sm:px-2.5 py-0.5 text-[9px] sm:text-[10px] font-black uppercase text-rose-700">
                       {text.wrong}
                     </span>
                   ) : null}
@@ -571,7 +571,7 @@ export default function MockTestClient() {
           <button
             onClick={submitted ? goToNextQuestion : submitCurrent}
             disabled={selectedIndex === null && !submitted}
-            className="rounded-xl bg-orange-500 px-8 py-3 font-bold text-white transition-all enabled:hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
+            className="rounded-xl bg-orange-500 px-6 sm:px-8 py-2 sm:py-3 text-xs sm:text-sm font-bold text-white transition-all enabled:hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-orange-300"
           >
             {submitted
               ? currentIndex === questions.length - 1

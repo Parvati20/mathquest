@@ -39,6 +39,101 @@ function emphasizeNumbers(text: string, tone: "pink" | "green") {
   });
 }
 
+function createQuizFromExample(question: string, answer: string) {
+  const answerNumbers = (answer.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+  const questionNumbers = (question.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+
+  const correctValue =
+    answerNumbers.length > 0
+      ? answerNumbers[answerNumbers.length - 1]
+      : questionNumbers.length > 0
+        ? questionNumbers[questionNumbers.length - 1]
+        : 10;
+
+  const seed = Math.max(2, Math.round(correctValue * 0.1));
+  const distractors = [
+    Math.max(1, correctValue - seed),
+    correctValue + seed,
+    Math.max(1, correctValue + seed * 2),
+  ];
+
+  const raw = [correctValue, ...distractors].filter((v, idx, arr) => arr.indexOf(v) === idx).slice(0, 4);
+  while (raw.length < 4) {
+    raw.push(raw[raw.length - 1] + 1);
+  }
+
+  // Keep deterministic order but avoid always showing correct option first.
+  const options = [raw[1], raw[0], raw[2], raw[3]].map((v) => String(v));
+  return {
+    options,
+    correctIndex: 1,
+  };
+}
+
+function getWorkedSteps(topic: string, question: string, answer: string) {
+  const numbers = (question.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+
+  if (topic === "profit-loss" && numbers.length >= 2) {
+    const cp = numbers[0];
+    const sp = numbers[1];
+    const profit = sp - cp;
+    const profitPercent = cp > 0 ? (profit / cp) * 100 : 0;
+
+    return [
+      `CP = ${cp}, SP = ${sp}`,
+      `Profit = SP - CP = ${sp} - ${cp} = ${profit}`,
+      `Profit% = (Profit/CP) x 100 = (${profit}/${cp}) x 100 = ${profitPercent}%`,
+    ];
+  }
+
+  if (topic === "percentage" && numbers.length >= 2) {
+    const percent = numbers[0];
+    const whole = numbers[1];
+    const result = (percent / 100) * whole;
+
+    return [
+      `Formula: (${percent}/100) x ${whole}`,
+      `Calculation: ${percent * whole}/100 = ${result}`,
+      `So, ${percent}% of ${whole} = ${result}`,
+    ];
+  }
+
+  if (topic === "simple-interest" && numbers.length >= 3) {
+    const p = numbers[0];
+    const r = numbers[1];
+    const t = numbers[2];
+    const si = (p * r * t) / 100;
+
+    return [
+      `Given: P=${p}, R=${r}, T=${t}`,
+      `SI = (P x R x T) / 100 = (${p} x ${r} x ${t})/100`,
+      `SI = ${si}`,
+    ];
+  }
+
+  if (topic === "linear-equations" && numbers.length >= 3) {
+    const a = numbers[0];
+    const b = numbers[1];
+    const c = numbers[2];
+    const rhs = c - b;
+    const x = a !== 0 ? rhs / a : 0;
+
+    return [
+      `Equation: ${a}x + ${b} = ${c}`,
+      `Move constant: ${a}x = ${c} - ${b} = ${rhs}`,
+      `Divide by ${a}: x = ${rhs}/${a} = ${x}`,
+    ];
+  }
+
+  const fallback = answer
+    .split(/\s*\.\s*|\s*=>\s*/)
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 3);
+
+  return fallback.length > 0 ? fallback : [answer];
+}
+
 export default function TopicContentClient({ topic, session }: TopicContentClientProps) {
   const { language } = useLanguage();
   const text = getUiText(language);
@@ -62,11 +157,8 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
   const [quizSelected, setQuizSelected] = useState<number | null>(null);
   const [quizResolved, setQuizResolved] = useState(false);
   const [quizCorrectIndex, setQuizCorrectIndex] = useState(0);
-  const [currentStreak, setCurrentStreak] = useState(0);
-  const [avgTime, setAvgTime] = useState(15);
   const [shakeWrong, setShakeWrong] = useState(false);
   const [quizOptions, setQuizOptions] = useState<string[]>([]);
-  const quizStartRef = useState(() => Date.now())[0];
 
   const previewImage = useMemo(() => {
     if (videoId.startsWith("http://") || videoId.startsWith("https://")) {
@@ -85,13 +177,10 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
   }, []);
 
   useEffect(() => {
-    const sourceText = `${data.examples?.[0]?.a ?? ""} ${data.examples?.[0]?.q ?? ""}`;
-    const parsed = Number(sourceText.match(/\d+/)?.[0] ?? "10");
-    const safeBase = Number.isFinite(parsed) ? parsed : 10;
-    const generated = [safeBase, safeBase + 2, Math.max(1, safeBase - 1), safeBase + 5]
-      .map((value) => String(value));
-    setQuizOptions(generated);
-    setQuizCorrectIndex(0);
+    const primaryExample = data.examples?.[0];
+    const quiz = createQuizFromExample(primaryExample?.q ?? "", primaryExample?.a ?? "");
+    setQuizOptions(quiz.options);
+    setQuizCorrectIndex(quiz.correctIndex);
     setQuizSelected(null);
     setQuizResolved(false);
   }, [data.examples]);
@@ -135,17 +224,13 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
     }
 
     setQuizSelected(optionIndex);
-    const elapsedSeconds = Math.max(1, Math.round((Date.now() - quizStartRef) / 1000));
-    setAvgTime((prev) => Math.round((prev + elapsedSeconds) / 2));
 
     if (optionIndex === quizCorrectIndex) {
       setQuizResolved(true);
-      setCurrentStreak((prev) => prev + 1);
       playTone("ding");
       return;
     }
 
-    setCurrentStreak(0);
     setShakeWrong(true);
     playTone("buzz");
     window.setTimeout(() => setShakeWrong(false), 450);
@@ -171,7 +256,7 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
         currentTopic={{ title: data.title, icon: meta.icon }}
       />
 
-      <main className="relative ml-[260px] flex-1 overflow-hidden pb-28">
+      <main className="relative ml-0 lg:ml-[260px] flex-1 overflow-hidden pb-20">
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div className="absolute left-[-10%] top-[-4%] h-[26rem] w-[26rem] rounded-full bg-[radial-gradient(circle,_rgba(233,30,99,0.14)_0%,_rgba(233,30,99,0.03)_46%,_transparent_74%)] blur-3xl" />
           <div className="absolute right-[-8%] top-[12%] h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,_rgba(100,116,139,0.14)_0%,_rgba(100,116,139,0.03)_42%,_transparent_74%)] blur-3xl" />
@@ -276,17 +361,6 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
                 );
               })}
             </div>
-
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div className="rounded-xl border border-[#E91E63]/20 bg-white/75 px-4 py-3 shadow-[0_0_16px_rgba(233,30,99,0.15)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E91E63]">Current Streak</p>
-                <p className="mt-1 text-lg font-black text-slate-900">🔥 {currentStreak}</p>
-              </div>
-              <div className="rounded-xl border border-[#E91E63]/20 bg-white/75 px-4 py-3 shadow-[0_0_16px_rgba(233,30,99,0.15)]">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#E91E63]">Avg. Time</p>
-                <p className="mt-1 text-lg font-black text-slate-900">⏱️ {avgTime}s</p>
-              </div>
-            </div>
           </div>
 
           <div className="mb-8 rounded-[2rem] border border-white/50 bg-white/45 p-6 shadow-[0_30px_80px_rgba(148,163,184,0.14)] backdrop-blur-2xl">
@@ -299,7 +373,7 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
             </div>
 
             <div className="space-y-4">
-              {data.examples?.map((example, i) => {
+              {data.examples?.slice(0, 1).map((example, i) => {
                 const isOpen = openExample === i;
 
                 return (
@@ -318,6 +392,15 @@ export default function TopicContentClient({ topic, session }: TopicContentClien
 
                     {isOpen ? (
                       <div className="border-t border-white/60 bg-gradient-to-r from-white/45 to-[#fff1f6]/70 px-5 py-5">
+                        <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-[#E91E63]">Step by Step</p>
+                        <ol className="space-y-1 text-sm leading-7 text-slate-700">
+                          {getWorkedSteps(topic, example.q, example.a).map((step, stepIndex) => (
+                            <li key={`${i}-step-${stepIndex}`}>
+                              <span className="font-bold text-slate-900">Step {stepIndex + 1}:</span>{" "}
+                              {emphasizeNumbers(step, "green")}
+                            </li>
+                          ))}
+                        </ol>
                         <p className="mb-2 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-500">Final Answer</p>
                         <p className="text-sm font-medium leading-7 text-slate-700">A: {emphasizeNumbers(example.a, "green")}</p>
                       </div>

@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { signIn, useSession } from "next-auth/react";
 import BrandLogo from "@/components/BrandLogo";
 
 interface FeatureCardProps {
@@ -13,6 +13,9 @@ interface FeatureCardProps {
 }
 
 export default function Home() {
+  const { status } = useSession();
+  const isLoggedIn = status === "authenticated";
+
   return (
     <main className="min-h-screen bg-[#FAFAFA] font-sans overflow-x-hidden">
 
@@ -23,12 +26,21 @@ export default function Home() {
           <Link href="/" className="text-sm font-semibold text-gray-600 hover:text-[#E91E63] transition-colors px-2">
             Home
           </Link>
-          <Link
-            href="/login"
-            className="flex items-center gap-2 bg-[#E91E63] hover:bg-[#c2185b] text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all hover:shadow-lg hover:shadow-pink-200 active:scale-95"
-          >
-            Login
-          </Link>
+          {isLoggedIn ? (
+            <Link
+              href="/tool"
+              className="flex items-center gap-2 bg-[#E91E63] hover:bg-[#c2185b] text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all hover:shadow-lg hover:shadow-pink-200 active:scale-95"
+            >
+              Dashboard
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="flex items-center gap-2 bg-[#E91E63] hover:bg-[#c2185b] text-white font-bold px-5 py-2.5 rounded-full text-sm transition-all hover:shadow-lg hover:shadow-pink-200 active:scale-95"
+            >
+              Login
+            </Link>
+          )}
         </div>
       </nav>
 
@@ -55,13 +67,23 @@ export default function Home() {
             Don&apos;t let math stop you from joining NavGurukul. We made it <strong className="text-gray-700">fun, easy</strong> &amp; totally free.
           </p>
 
-          <Link
-            href="/login"
-            className="group inline-flex items-center gap-3 bg-gradient-to-r from-[#E91E63] to-[#FF4081] hover:from-[#c2185b] hover:to-[#E91E63] text-white font-black py-4 px-8 rounded-2xl shadow-xl shadow-pink-200 transition-all hover:scale-105 active:scale-95 text-lg w-fit"
-          >
-            Get Started Free
-            <span className="group-hover:translate-x-1 transition-transform">→</span>
-          </Link>
+          {isLoggedIn ? (
+            <Link
+              href="/tool"
+              className="group inline-flex items-center gap-3 bg-gradient-to-r from-[#E91E63] to-[#FF4081] hover:from-[#c2185b] hover:to-[#E91E63] text-white font-black py-4 px-8 rounded-2xl shadow-xl shadow-pink-200 transition-all hover:scale-105 active:scale-95 text-lg w-fit"
+            >
+              Go to Dashboard
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="group inline-flex items-center gap-3 bg-gradient-to-r from-[#E91E63] to-[#FF4081] hover:from-[#c2185b] hover:to-[#E91E63] text-white font-black py-4 px-8 rounded-2xl shadow-xl shadow-pink-200 transition-all hover:scale-105 active:scale-95 text-lg w-fit"
+            >
+              Get Started Free
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
+            </Link>
+          )}
 
           <div className="flex items-center gap-5 mt-5">
             {["100% Free", "No Sign-up Fee", "Works on Mobile"].map((t) => (
@@ -125,13 +147,22 @@ export default function Home() {
           <h3 className="text-3xl md:text-4xl font-black text-white mb-6">
             Your NavGurukul journey<br />starts here 🚀
           </h3>
-          <button
-            onClick={() => signIn("google", { callbackUrl: "/tool" })}
-            className="inline-flex items-center gap-3 bg-white text-[#E91E63] font-black py-4 px-10 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-lg"
-          >
-            <Image src="/google.png" alt="Google" width={20} height={20} className="object-contain" />
-            Get Started Free →
-          </button>
+          {isLoggedIn ? (
+            <Link
+              href="/tool"
+              className="inline-flex items-center gap-3 bg-white text-[#E91E63] font-black py-4 px-10 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-lg"
+            >
+              Go to Dashboard →
+            </Link>
+          ) : (
+            <button
+              onClick={() => signIn("google", { callbackUrl: "/tool" })}
+              className="inline-flex items-center gap-3 bg-white text-[#E91E63] font-black py-4 px-10 rounded-2xl shadow-lg transition-all hover:scale-105 active:scale-95 text-lg"
+            >
+              <Image src="/google.png" alt="Google" width={20} height={20} className="object-contain" />
+              Get Started Free →
+            </button>
+          )}
         </div>
       </section>
 

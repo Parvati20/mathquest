@@ -1,10 +1,21 @@
 "use client";
 import Image from "next/image";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { signIn, useSession } from "next-auth/react";
 import BrandLogo from "@/components/BrandLogo";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { status } = useSession();
+
+  useEffect(() => {
+    if (status === "authenticated") {
+      router.replace("/tool");
+    }
+  }, [router, status]);
+
   return (
     <main className="min-h-screen bg-[#FAFAFA] font-sans flex flex-col">
 

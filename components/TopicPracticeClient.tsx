@@ -326,7 +326,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
 
   return (
     <main
-      className="relative min-h-screen overflow-hidden bg-[#0B1020] font-sans text-white"
+      className="relative min-h-screen overflow-hidden bg-[#FDF2F8] font-sans text-gray-800"
       onMouseMove={(event) => {
         const { clientX, clientY, currentTarget } = event;
         const rect = currentTarget.getBoundingClientRect();
@@ -335,9 +335,9 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
       }}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(233,30,99,0.18),transparent_28%),radial-gradient(circle_at_78%_16%,rgba(59,130,246,0.14),transparent_26%),radial-gradient(circle_at_65%_80%,rgba(249,115,22,0.10),transparent_24%),linear-gradient(180deg,#0B1020_0%,#11172B_100%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(233,30,99,0.10),transparent_30%),radial-gradient(circle_at_78%_16%,rgba(249,115,22,0.08),transparent_30%),linear-gradient(180deg,#FDF2F8_0%,#FFF1F7_100%)]" />
         <div
-          className="animate-float absolute left-[10%] top-[18%] h-20 w-20 rounded-[1.75rem] border border-white/10 bg-white/5 backdrop-blur-sm"
+          className="animate-float absolute left-[10%] top-[18%] h-20 w-20 rounded-[1.75rem] border border-pink-200/60 bg-white/50 backdrop-blur-sm"
           style={{ transform: `translate(${(mouseX - 0.5) * -16}px, ${(mouseY - 0.5) * -16}px)` }}
         />
         <div
@@ -345,57 +345,57 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
           style={{ animationDelay: "1.4s", transform: `translate(${(mouseX - 0.5) * 18}px, ${(mouseY - 0.5) * 18}px)` }}
         />
         <div
-          className="animate-float absolute bottom-[18%] left-[18%] h-16 w-16 rounded-full border border-blue-300/10 bg-blue-400/10"
+          className="animate-float absolute bottom-[18%] left-[18%] h-16 w-16 rounded-full border border-pink-200/50 bg-pink-100/50"
           style={{ animationDelay: "2.3s", transform: `translate(${(mouseX - 0.5) * -12}px, ${(mouseY - 0.5) * 12}px)` }}
         />
       </div>
 
-      <nav className="relative flex items-center justify-between border-b border-white/10 bg-[#0F172A]/65 px-6 py-4 backdrop-blur-xl">
-        <BrandLogo textClassName="text-[1.15rem] tracking-wide" secondaryClassName="text-white" />
-        <Link href={`/${topic}`} className="text-sm font-semibold text-[#ff9cbc] hover:text-white">
+      <nav className="relative flex items-center justify-between border-b border-pink-100 bg-white/80 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl">
+        <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
+        <Link href={`/${topic}`} className="text-sm font-semibold text-[#E91E63] hover:text-pink-700">
           {text.learnConcept}
         </Link>
       </nav>
 
-      <section className="relative mx-auto max-w-6xl px-6 py-10 pb-36">
-        <Link href={`/${topic}`} className="text-sm text-white/45 hover:text-[#ff9cbc]">
+      <section className="relative mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 pb-28">
+        <Link href={`/${topic}`} className="text-xs sm:text-sm text-gray-500 hover:text-[#E91E63]">
           &larr; {localizedTopic.title}
         </Link>
 
-        <div className="mt-5 flex flex-wrap items-center gap-3">
+        <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-3">
           {difficulties.map((item) => (
             <button
               key={item}
               onClick={() => handleDifficulty(item)}
-              className={`rounded-full border px-4 py-1.5 text-sm font-medium capitalize transition-all ${
+              className={`rounded-full border px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm font-medium capitalize transition-all ${
                 difficulty === item
-                  ? "border-[#E91E63]/40 bg-[#E91E63]/18 text-[#ff9cbc] shadow-[0_0_20px_rgba(233,30,99,0.2)]"
-                  : "border-white/10 bg-white/5 text-white/50 hover:border-[#E91E63]/25 hover:text-white"
+                  ? "border-[#E91E63] bg-[#E91E63]/12 text-[#E91E63] shadow-[0_0_16px_rgba(233,30,99,0.16)]"
+                  : "border-pink-100 bg-white/85 text-gray-500 hover:border-[#E91E63]/35 hover:text-[#E91E63]"
               }`}
             >
               {getLocalizedDifficultyLabel(item, language)}
             </button>
           ))}
-          <LanguageSelect className="border-white/10 bg-white/10 py-1 text-white [&>option]:text-gray-900" />
+          <LanguageSelect className="border-pink-100 bg-white py-1 text-gray-700 text-xs sm:text-sm [&>option]:text-gray-900" />
         </div>
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px]">
-          <div>
-            <div className="mb-4 flex items-center justify-between gap-4 text-sm text-white/70">
-              <span className="inline-flex items-center rounded-full border border-[#E91E63]/25 bg-[#E91E63]/12 px-3 py-1 text-xs font-black uppercase tracking-[0.16em] text-[#ff9cbc] shadow-[0_0_20px_rgba(233,30,99,0.16)]">
+        <div className="mt-6 grid gap-6 lg:grid-cols-12">
+          <div className="flex flex-col lg:col-span-9">
+            <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
+              <span className="inline-flex items-center rounded-full border border-[#E91E63]/40 bg-[#E91E63]/10 px-3 py-1 text-[10px] sm:text-xs font-black uppercase tracking-[0.16em] text-[#E91E63]">
                 {text.question} {questionNumber} {text.of} {total}
               </span>
-              <span className="capitalize text-white/55">{getLocalizedDifficultyLabel(difficulty, language)}</span>
+              <span className="capitalize text-gray-500 text-xs">{getLocalizedDifficultyLabel(difficulty, language)}</span>
             </div>
 
-            <div className="relative h-5 w-full rounded-full border border-white/10 bg-white/5 p-1 shadow-inner shadow-black/20">
+            <div className="relative h-5 w-full rounded-full border border-pink-100 bg-white p-1 shadow-inner shadow-pink-100/60">
               <div
                 className="h-full rounded-full bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_0_24px_rgba(233,30,99,0.35)] transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-xs text-white/45">
+            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
               <span>{text.correct}: {correctCount}</span>
               <span>{text.wrong}: {wrongCount}</span>
             </div>
@@ -410,7 +410,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
           )}
             </p>
 
-            <article className="relative mt-6 overflow-hidden rounded-[2rem] border border-white/15 bg-white/10 p-6 shadow-[0_24px_80px_rgba(0,0,0,0.28)] backdrop-blur-xl">
+            <article className="relative mt-6 overflow-hidden rounded-[2rem] border border-pink-100 bg-white/90 p-4 sm:p-6 shadow-xl backdrop-blur-sm">
           {burstTick > 0 && submitted && isCorrect ? (
             <div key={burstTick} className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
               <span className="confetti confetti-a" />
@@ -420,9 +420,9 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
             </div>
           ) : null}
 
-              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
+              <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-pink-300/50 to-transparent" />
 
-              <h2 className="text-3xl font-black leading-tight text-white md:text-4xl">{localizedCurrentQuestion?.question}</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight text-gray-800">{localizedCurrentQuestion?.question}</h2>
 
               <div className="mt-6 space-y-3">
                 {localizedCurrentQuestion?.options.map((option, optionIndex) => {
@@ -439,17 +439,17 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
                       setSelectedIndex(optionIndex);
                     }
                   }}
-                  className={`flex w-full items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-200 ${
+                  className={`flex w-full items-center gap-3 sm:gap-4 rounded-2xl border px-3 sm:px-4 py-3 sm:py-4 text-left transition-all duration-200 text-sm sm:text-base ${
                     showCorrect
-                      ? "border-emerald-300/70 bg-emerald-500/14 shadow-[0_0_24px_rgba(16,185,129,0.16)]"
+                      ? "border-emerald-300 bg-emerald-50 shadow-[0_6px_20px_rgba(16,185,129,0.14)]"
                       : showWrong
-                        ? "border-red-300/70 bg-red-500/12 shadow-[0_0_24px_rgba(239,68,68,0.16)]"
+                        ? "border-red-300 bg-red-50 shadow-[0_6px_20px_rgba(239,68,68,0.12)]"
                         : isPicked
-                          ? "border-[#E91E63]/70 bg-[#E91E63]/14 shadow-[0_0_28px_rgba(233,30,99,0.22)]"
-                          : "border-white/10 bg-white/5 hover:scale-[1.02] hover:border-[#E91E63]/35 hover:bg-white/10 hover:shadow-[0_0_24px_rgba(233,30,99,0.14)]"
+                          ? "border-[#E91E63]/70 bg-[#E91E63]/10 shadow-[0_0_20px_rgba(233,30,99,0.16)]"
+                          : "border-pink-100 bg-white hover:scale-[1.02] hover:border-[#E91E63]/30 hover:bg-pink-50"
                   }`}
                 >
-                  <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br text-sm font-black text-white shadow-lg ${
+                  <span className={`inline-flex h-8 sm:h-9 w-8 sm:w-9 items-center justify-center rounded-full bg-gradient-to-br text-xs sm:text-sm font-black text-white shadow-lg flex-shrink-0 ${
                     showCorrect
                       ? "from-emerald-400 to-emerald-600"
                       : showWrong
@@ -460,7 +460,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
                   }`}>
                     {optionLetter}
                   </span>
-                  <span className="text-white/90">{option}</span>
+                  <span className="text-gray-700">{option}</span>
                 </button>
               );
             })}
@@ -468,52 +468,53 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
             </article>
 
             {!isCorrect && submitted ? (
-              <div className="mt-4 rounded-[1.5rem] border border-sky-300/20 bg-sky-500/10 p-4 backdrop-blur-md">
-                <p className="text-sm font-bold text-sky-200">{text.aiMentor} ({language})</p>
-                {aiLoading ? <p className="mt-2 text-sm text-sky-100">{text.generating}</p> : null}
-                {aiError ? <p className="mt-2 text-sm text-red-300">{aiError}</p> : null}
-                {aiExplanation ? <p className="mt-2 text-sm leading-relaxed text-white/80">{aiExplanation}</p> : null}
+              <div className="relative z-10 mt-4 w-full rounded-[1.5rem] border border-sky-200 bg-white/90 p-3 sm:p-4 shadow-md">
+                <p className="text-xs sm:text-sm font-bold text-sky-700">{text.aiMentor} ({language})</p>
+                {aiLoading ? <p className="mt-2 text-xs sm:text-sm text-sky-600">{text.generating}</p> : null}
+                {aiError ? <p className="mt-2 text-xs sm:text-sm text-red-500">{aiError}</p> : null}
+                {aiExplanation ? <p className="mt-2 text-xs sm:text-sm leading-relaxed text-gray-700">{aiExplanation}</p> : null}
               </div>
             ) : null}
+
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-xl">
+              <p className={`text-xs sm:text-sm font-semibold ${submitted ? (isCorrect ? "text-emerald-600" : "text-red-500") : "text-gray-600"}`}>
+              {submitted
+                ? `${isCorrect ? text.correctFeedback : text.incorrect} ${localizedCurrentQuestion?.explanation ?? ""}`
+                : text.chooseOption}
+              </p>
+
+              <button
+                onClick={submitted ? handleNext : handleSubmit}
+                disabled={!submitted && selectedIndex === null}
+                className={`rounded-2xl px-6 sm:px-8 py-3 font-black text-white transition-all disabled:cursor-not-allowed disabled:bg-pink-100 disabled:text-pink-300 text-sm sm:text-base whitespace-nowrap ${
+                  selectedIndex !== null && !submitted
+                    ? "animate-submit-pulse bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_16px_34px_rgba(233,30,99,0.30)] hover:scale-[1.02]"
+                    : "bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_16px_34px_rgba(233,30,99,0.24)]"
+                }`}
+              >
+                {submitted ? (index === total - 1 ? text.showResult : text.next) : text.submit}
+              </button>
+            </div>
           </div>
 
-          <aside className="space-y-3 lg:pt-10">
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur-xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Accuracy</p>
-              <p className="mt-2 text-2xl font-black text-white">🎯 {liveAccuracy}%</p>
-            </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur-xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">Current Streak</p>
-              <p className="mt-2 text-2xl font-black text-white">🔥 {currentStreak}</p>
-            </div>
-            <div className="rounded-[1.5rem] border border-white/10 bg-white/10 p-4 shadow-xl backdrop-blur-xl">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/40">XP Gained</p>
-              <p className="mt-2 text-2xl font-black text-white">✨ {xpGained}</p>
+          <aside className="mt-6 lg:mt-0 lg:pt-10 lg:col-span-3">
+            <div className="grid gap-3 grid-cols-1 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
+                <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">Accuracy</p>
+                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-black text-gray-800">🎯 {liveAccuracy}%</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
+                <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">Streak</p>
+                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-black text-gray-800">🔥 {currentStreak}</p>
+              </div>
+              <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
+                <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">XP</p>
+                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-black text-gray-800">✨ {xpGained}</p>
+              </div>
             </div>
           </aside>
         </div>
 
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/10 bg-[#0B1020]/88 backdrop-blur-xl lg:left-[260px]">
-          <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4">
-            <p className={`text-sm font-semibold ${submitted ? (isCorrect ? "text-emerald-300" : "text-red-300") : "text-white/45"}`}>
-            {submitted
-              ? `${isCorrect ? text.correctFeedback : text.incorrect} ${localizedCurrentQuestion?.explanation ?? ""}`
-              : text.chooseOption}
-            </p>
-
-            <button
-              onClick={submitted ? handleNext : handleSubmit}
-              disabled={!submitted && selectedIndex === null}
-              className={`rounded-2xl px-8 py-3 font-black text-white transition-all disabled:cursor-not-allowed disabled:bg-white/15 disabled:text-white/30 ${
-                selectedIndex !== null && !submitted
-                  ? "animate-submit-pulse bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_16px_34px_rgba(233,30,99,0.30)] hover:scale-[1.02]"
-                  : "bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_16px_34px_rgba(233,30,99,0.24)]"
-              }`}
-            >
-              {submitted ? (index === total - 1 ? text.showResult : text.next) : text.submit}
-            </button>
-          </div>
-        </div>
       </section>
     </main>
   );
