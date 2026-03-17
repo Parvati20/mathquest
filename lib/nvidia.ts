@@ -172,8 +172,7 @@ export async function generateMathQuestions({
   if (!response.ok) {
     const errorBody = await response.text();
     throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
-  }
-
+  } 
   const data = await response.json();
   const raw = String(data?.choices?.[0]?.message?.content ?? "");
   const jsonBlock = extractJsonObject(raw);
