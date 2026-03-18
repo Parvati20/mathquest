@@ -392,7 +392,6 @@ function localizeGeneratedQuestionText(text: string, language: AppLanguage): str
 
   return localized;
 }
-
 export function getLocalizedQuestion<T extends {
   translations?: Partial<Record<AppLanguage, { question: string; options: string[]; explanation: string }>>;
   question: string;
