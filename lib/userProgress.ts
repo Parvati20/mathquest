@@ -15,7 +15,6 @@ export interface UserProgress {
   mockBestScore: number;
   updatedAt: Date;
 }
-
 export async function getUserProgress(userId: string): Promise<UserProgress | null> {
   const client = await mongoClientPromise;
   const db = client.db();

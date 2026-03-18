@@ -1,5 +1,3 @@
-// lib/topicsData.ts
-
 export const topicsData = {
   "number-patterns": {
     title: "Number Patterns",

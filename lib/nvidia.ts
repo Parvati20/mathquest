@@ -180,7 +180,6 @@ export async function generateMathQuestions({
   if (!jsonBlock) {
     return [];
   }
-
   try {
     const parsed = JSON.parse(jsonBlock) as { questions?: unknown };
     return normalizeGeneratedQuestions(parsed.questions, topic, difficulty, safeCount);

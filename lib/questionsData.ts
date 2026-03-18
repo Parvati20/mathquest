@@ -405,7 +405,6 @@ function generateProfitLoss(): TopicQuestion[] {
       explanation: `Profit = ${pPercent}% of ${cp} = ${answer}.`,
     });
   }
-
   for (let i = 1; i <= 14; i += 1) {
     const cp = 300 + i * 25;
     const lossPercent = 5 + (i % 5) * 5;
@@ -425,7 +424,6 @@ function generateProfitLoss(): TopicQuestion[] {
 
   return questions;
 }
-
 export const questionsData: Record<string, TopicQuestion[]> = {
   "number-patterns": generateNumberPatterns(),
   percentage: generatePercentage(),
@@ -434,7 +432,6 @@ export const questionsData: Record<string, TopicQuestion[]> = {
   "simple-interest": generateSimpleInterest(),
   "profit-loss": generateProfitLoss(),
 };
-
 export const TOTAL_QUESTION_COUNT = Object.values(questionsData).reduce(
   (sum, topicQuestions) => sum + topicQuestions.length,
   0,
