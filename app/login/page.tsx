@@ -3,25 +3,28 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import BrandLogo from "@/components/BrandLogo";
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { status } = useSession();
+  const callbackUrl = searchParams.get("callbackUrl") || "/tool";
 
   useEffect(() => {
     if (status === "authenticated") {
-      router.replace("/tool");
+      router.replace(callbackUrl);
     }
-  }, [router, status]);
+  }, [router, status, callbackUrl]);
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] font-sans flex flex-col">
 
       <nav className="flex items-center justify-between px-6 md:px-12 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <Link href="/">
-          <BrandLogo textClassName="text-[1.55rem] tracking-wide" />
+          <BrandLogo />
         </Link>
         <Link href="/" className="text-sm font-semibold text-gray-500 hover:text-[#E91E63] transition-colors">
           ← Back to Home
@@ -47,7 +50,7 @@ export default function LoginPage() {
             </p>
 
             <button
-              onClick={() => signIn("google", { callbackUrl: "/tool" })}
+              onClick={() => signIn("google", { callbackUrl })}
               className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-[#E91E63] text-gray-800 font-bold py-4 px-6 rounded-2xl transition-all hover:shadow-lg hover:shadow-pink-100 active:scale-95 text-base group"
             >
               <Image src="/google.png" alt="Google" width={22} height={22} className="object-contain" />

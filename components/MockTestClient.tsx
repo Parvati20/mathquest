@@ -271,7 +271,7 @@ export default function MockTestClient() {
         </div>
 
         <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
-          <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
+          <BrandLogo />
           <Link
             href="/tool"
             className="text-xs sm:text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
@@ -439,7 +439,7 @@ export default function MockTestClient() {
       </div>
 
       <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md flex-wrap gap-2">
-        <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
+        <BrandLogo />
         <div className="flex items-center gap-2 sm:gap-3">
           <LanguageSelect className="bg-white text-xs sm:text-sm" />
           <div className="rounded-full border border-[#E91E63]/15 bg-gradient-to-r from-[#E91E63]/12 to-[#FF8A65]/12 px-3 sm:px-4 py-1 sm:py-1.5 text-xs sm:text-sm font-black text-[#E91E63]">

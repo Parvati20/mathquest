@@ -266,7 +266,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
     return (
       <main className="min-h-screen bg-[#FFFBF5] font-sans">
         <nav className="flex items-center justify-between border-b border-gray-100 bg-white/80 px-6 py-3 backdrop-blur-md">
-          <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
+          <BrandLogo />
           <Link href={`/${topic}`} className="text-sm font-semibold text-orange-500 hover:text-orange-600">
             {text.learnConcept}
           </Link>
@@ -351,7 +351,7 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
       </div>
 
       <nav className="relative flex items-center justify-between border-b border-pink-100 bg-white/80 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl">
-        <BrandLogo textClassName="text-[1.15rem] tracking-wide" />
+        <BrandLogo />
         <Link href={`/${topic}`} className="text-sm font-semibold text-[#E91E63] hover:text-pink-700">
           {text.learnConcept}
         </Link>
@@ -502,10 +502,6 @@ export default function TopicPracticeClient({ topic, topicTitle, questions }: To
               <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
                 <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">Accuracy</p>
                 <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-black text-gray-800">🎯 {liveAccuracy}%</p>
-              </div>
-              <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
-                <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">Streak</p>
-                <p className="mt-1 sm:mt-2 text-lg sm:text-2xl font-black text-gray-800">🔥 {currentStreak}</p>
               </div>
               <div className="rounded-[1.5rem] border border-pink-100 bg-white/90 p-3 sm:p-4 shadow-md">
                 <p className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.18em] text-gray-400">XP</p>

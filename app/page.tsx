@@ -20,7 +20,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#FAFAFA] font-sans overflow-x-hidden">
 
       <nav className="flex items-center justify-between px-6 md:px-12 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100 sticky top-0 z-50">
-        <BrandLogo textClassName="text-[2rem] tracking-wide" />
+        <BrandLogo />
 
         <div className="flex items-center gap-3">
           <Link href="/" className="text-sm font-semibold text-gray-600 hover:text-[#E91E63] transition-colors px-2">

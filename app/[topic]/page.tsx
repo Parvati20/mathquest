@@ -14,8 +14,8 @@ export default async function TopicPage({ params }: PageProps) {
   const { topic } = await params;
   const data = topicsData[topic as keyof typeof topicsData];
 
-  if (!session?.user) {
-    redirect("/");
+  if (!session?.user?.email) {
+    redirect(`/login?callbackUrl=${encodeURIComponent(`/${topic}`)}`);
   }
 
   if (!data) return notFound();

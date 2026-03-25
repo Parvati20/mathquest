@@ -1,14 +1,20 @@
+import Image from "next/image";
+
 type BrandLogoProps = {
   className?: string;
-  textClassName?: string;
-  secondaryClassName?: string;
 };
 
-export default function BrandLogo({ className = "", textClassName = "", secondaryClassName = "text-slate-900" }: BrandLogoProps) {
+export default function BrandLogo({ className = "" }: BrandLogoProps) {
   return (
-    <span className={`inline-flex items-end leading-none select-none ${className}`.trim()}>
-      <span className={`font-samarkan text-[#E91E63] ${textClassName}`.trim()}>nav</span>
-      <span className={`font-samarkan -ml-0.5 ${secondaryClassName} ${textClassName}`.trim()}>gurukul</span>
-    </span>
+    <div className={`inline-flex items-center select-none ${className}`.trim()}>
+      <Image
+        src="/ng-logo-horizontal.avif"
+        alt="NavGurukul"
+        width={140}
+        height={40}
+        priority
+        className="h-9 w-auto object-contain"
+      />
+    </div>
   );
 }
