@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect,useState } from "react";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
@@ -12,7 +12,9 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { status } = useSession();
-  const callbackUrl = searchParams.get("callbackUrl") || "/tool";
+//   const callbackUrl = searchParams.get("callbackUrl") || "/tool";
+const [callbackUrl, setCallbackUrl] = useState("/tool");
+
 
   useEffect(() => {
     if (status === "authenticated") {
