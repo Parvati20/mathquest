@@ -25,5 +25,5 @@ export default async function TopicPracticePage({ params }: PageProps) {
     return notFound();
   }
 
-  return <TopicPracticeClient topic={topic} topicTitle={topicInfo.title} questions={questions} />;
+  return <TopicPracticeClient topic={topic} questions={questions} />;
 }

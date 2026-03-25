@@ -11,7 +11,6 @@ import type { Difficulty, TopicQuestion } from "@/lib/questionsData";
 
 type TopicPracticeClientProps = {
   topic: string;
-  topicTitle: string;
   questions: TopicQuestion[];
 };
 
@@ -34,7 +33,7 @@ function pickSession<T>(items: T[], count: number, seed: number) {
   return session;
 }
 
-export default function TopicPracticeClient({ topic, topicTitle, questions }: TopicPracticeClientProps) {
+export default function TopicPracticeClient({ topic, questions }: TopicPracticeClientProps) {
   const { language } = useLanguage();
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [sessionSeed, setSessionSeed] = useState(0);
