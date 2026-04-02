@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     const blockedQuestionSignatures = Array.isArray(body.blockedQuestionSignatures)
       ? body.blockedQuestionSignatures
           .filter((value): value is string => typeof value === "string")
-          .map((value) => value.trim())
+          .map((value: string) => value.trim())
           .filter(Boolean)
           .slice(0, 300)
       : [];
