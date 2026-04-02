@@ -1,0 +1,280 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+.confetti {
+  position: absolute;
+  top: -10%;
+  width: 10px;
+  height: 18px;
+  border-radius: 2px;
+  opacity: 0;
+  animation: confettiFall 700ms ease-out forwards;
+}
+
+.confetti-a {
+  left: 15%;
+  background: #f97316;
+}
+
+.confetti-b {
+  left: 35%;
+  background: #10b981;
+  animation-delay: 60ms;
+}
+
+.confetti-c {
+  left: 60%;
+  background: #f59e0b;
+  animation-delay: 90ms;
+}
+
+.confetti-d {
+  left: 80%;
+  background: #3b82f6;
+  animation-delay: 120ms;
+}
+
+.mega-confetti-1,
+.mega-confetti-2,
+.mega-confetti-3,
+.mega-confetti-4,
+.mega-confetti-5,
+.mega-confetti-6 {
+  width: 12px;
+  height: 22px;
+  animation-duration: 1200ms;
+}
+
+.mega-confetti-1 {
+  left: 8%;
+  background: #22c55e;
+}
+
+.mega-confetti-2 {
+  left: 24%;
+  background: #f97316;
+  animation-delay: 80ms;
+}
+
+.mega-confetti-3 {
+  left: 40%;
+  background: #eab308;
+  animation-delay: 140ms;
+}
+
+.mega-confetti-4 {
+  left: 58%;
+  background: #3b82f6;
+  animation-delay: 200ms;
+}
+
+.mega-confetti-5 {
+  left: 74%;
+  background: #ec4899;
+  animation-delay: 260ms;
+}
+
+.mega-confetti-6 {
+  left: 90%;
+  background: #14b8a6;
+  animation-delay: 320ms;
+}
+
+@keyframes confettiFall {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(220px) rotate(220deg);
+    opacity: 0;
+  }
+}
+
+@keyframes floatDrift {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(0, -14px, 0) rotate(3deg);
+  }
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+}
+
+.animate-float {
+  animation: floatDrift 7s ease-in-out infinite;
+}
+
+@keyframes submitPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0.34);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(233, 30, 99, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(233, 30, 99, 0);
+  }
+}
+
+.animate-submit-pulse {
+  animation: submitPulse 1.8s ease-out infinite;
+}
+
+@keyframes shakeHorizontal {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-6px);
+  }
+  40% {
+    transform: translateX(6px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+.animate-shake {
+  animation: shakeHorizontal 350ms ease-in-out;
+}
+
+@keyframes fireworkBurst {
+  0% {
+    transform: translate(-50%, -50%) scale(0.15);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.2);
+    opacity: 0;
+  }
+}
+
+.firework {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  opacity: 0;
+  animation: fireworkBurst 900ms ease-out forwards;
+  box-shadow:
+    0 -56px 0 -6px currentColor,
+    40px -40px 0 -6px currentColor,
+    56px 0 0 -6px currentColor,
+    40px 40px 0 -6px currentColor,
+    0 56px 0 -6px currentColor,
+    -40px 40px 0 -6px currentColor,
+    -56px 0 0 -6px currentColor,
+    -40px -40px 0 -6px currentColor,
+    0 -84px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    60px -60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    84px 0 0 -10px color-mix(in srgb, currentColor 80%, white),
+    60px 60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    0 84px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -60px 60px 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -84px 0 0 -10px color-mix(in srgb, currentColor 80%, white),
+    -60px -60px 0 -10px color-mix(in srgb, currentColor 80%, white);
+}
+
+.firework-a {
+  top: 18%;
+  left: 18%;
+  color: #ec4899;
+}
+
+.firework-b {
+  top: 10%;
+  left: 50%;
+  color: #f97316;
+  animation-delay: 80ms;
+}
+
+.firework-c {
+  top: 18%;
+  left: 82%;
+  color: #22c55e;
+  animation-delay: 160ms;
+}
+
+.firework-d {
+  top: 40%;
+  left: 28%;
+  color: #3b82f6;
+  animation-delay: 220ms;
+}
+
+.firework-e {
+  top: 42%;
+  left: 72%;
+  color: #eab308;
+  animation-delay: 280ms;
+}
+
+.firework-f {
+  top: 62%;
+  left: 14%;
+  color: #8b5cf6;
+  animation-delay: 140ms;
+}
+
+.firework-g {
+  top: 62%;
+  left: 50%;
+  color: #14b8a6;
+  animation-delay: 320ms;
+}
+
+.firework-h {
+  top: 62%;
+  left: 86%;
+  color: #fb7185;
+  animation-delay: 380ms;
+}
+
+
+
+@font-face {
+  font-family: 'Samarkan';
+  src: url('/fonts/Samarkan.ttf') format('truetype'); /* Check karein folder name 'fonts' hai ya direct 'public' mein hai */
+  font-weight: normal;
+  font-style: normal;
+}
+
+.font-samarkan {
+  font-family: 'Samarkan', cursive;
+}
