@@ -190,7 +190,7 @@ function normalizeGeneratedQuestions(
     const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
     const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
     const options = Array.isArray(record.options)
-      ? record.options.filter((value): value is string => typeof value === "string").map((value) => value.trim())
+      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
       : [];
 
     if (!question || !explanation || options.length !== 4 || answerIndex < 0 || answerIndex > 3) {
@@ -283,7 +283,7 @@ export async function generateMathQuestions({
   const blockedSignatures = new Set(
     blockedQuestionSignatures
       .filter((value): value is string => typeof value === "string")
-      .map((value) => value.trim())
+      .map((value: string) => value.trim())
       .filter(Boolean),
   );
 
@@ -405,7 +405,7 @@ function normalizeMockGeneratedQuestions(questions: unknown, count: number): Moc
     const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
     const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
     const options = Array.isArray(record.options)
-      ? record.options.filter((value): value is string => typeof value === "string").map((value) => value.trim())
+      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
       : [];
 
     if (!allowedTopics.has(topic) || !question || !explanation || options.length !== 4 || answerIndex < 0 || answerIndex > 3) {
