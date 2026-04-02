@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const topic = typeof body.topic === "string" ? body.topic.trim() : "";
     const question = typeof body.question === "string" ? body.question.trim() : "";
     const options = Array.isArray(body.options)
-      ? body.options.filter((item: unknown): item is string => typeof item === "string").map((item) => item.trim()).filter(Boolean)
+      ? body.options.filter((item: unknown): item is string => typeof item === "string").map((item: string) => item.trim()).filter(Boolean)
       : [];
     const correctAnswer = typeof body.correctAnswer === "string" ? body.correctAnswer.trim() : "";
     const baseExplanation = typeof body.baseExplanation === "string" ? body.baseExplanation.trim() : "";
