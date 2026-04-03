@@ -2,6 +2,32 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+### Auth Setup (required for Google login)
+
+1. Create a local env file:
+
+```bash
+cp .env.example .env.local
+```
+
+On Windows PowerShell:
+
+```powershell
+Copy-Item .env.example .env.local
+```
+
+2. Fill these values in `.env.local`:
+
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `NEXTAUTH_URL` (use `http://localhost:3000`)
+- `NEXTAUTH_SECRET`
+- `JWT_SECRET`
+
+3. In Google Cloud Console, add this Authorized redirect URI:
+
+`http://localhost:3000/api/auth/callback/google`
+
 First, run the development server:
 
 ```bash

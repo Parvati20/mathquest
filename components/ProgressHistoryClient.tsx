@@ -64,7 +64,25 @@ export default function ProgressHistoryClient({ session, progress }: Props) {
   const totalWrong = progress.totalWrong ?? 0;
   const totalPoints = progress.totalPoints ?? 0;
   const overallAccuracy = totalAttempts > 0 ? Math.round((totalSolved / totalAttempts) * 100) : 0;
-  const latestPractice = [...(progress.practiceSessions ?? [])].reverse().slice(0, 15);
+  const latestPracticeTopics = (() => {
+    const seen = new Set<string>();
+    const uniqueTopics: Array<{ topicId: string; createdAt?: string | Date }> = [];
+
+    for (const sessionItem of [...(progress.practiceSessions ?? [])].reverse()) {
+      if (seen.has(sessionItem.topicId)) {
+        continue;
+      }
+
+      seen.add(sessionItem.topicId);
+      uniqueTopics.push({ topicId: sessionItem.topicId, createdAt: sessionItem.createdAt });
+
+      if (uniqueTopics.length >= 12) {
+        break;
+      }
+    }
+
+    return uniqueTopics;
+  })();
   const latestMocks = [...(progress.mockHistory ?? [])].reverse().slice(0, 10);
 
   const getTopicTitle = (topicId: string) =>
@@ -231,12 +249,12 @@ export default function ProgressHistoryClient({ session, progress }: Props) {
           <div className="rounded-2xl border border-white/70 bg-white/85 p-4 shadow-sm">
             <h3 className="text-base font-black text-slate-900">Recent Practice Sessions</h3>
             <div className="mt-3 space-y-2">
-              {latestPractice.length > 0 ? latestPractice.map((sessionItem, idx) => (
+              {latestPracticeTopics.length > 0 ? latestPracticeTopics.map((sessionItem, idx) => (
                 <div key={`${sessionItem.topicId}-${idx}`} className="rounded-xl border border-slate-100 bg-white p-3 text-xs text-slate-600">
                   <div className="flex flex-col items-start justify-between gap-2 sm:flex-row sm:gap-3">
                     <div>
                       <p className="font-bold text-slate-800">{topicsData[sessionItem.topicId as keyof typeof topicsData]?.title ?? sessionItem.topicId}</p>
-                      <p className="mt-1">Correct {sessionItem.correctCount} • Wrong {sessionItem.wrongCount} • Marks {sessionItem.points} • Accuracy {sessionItem.accuracy}%</p>
+                      <p className="mt-1 text-slate-500">Practiced topic</p>
                     </div>
                     <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-600">
                       {formatSessionDate(sessionItem.createdAt)}

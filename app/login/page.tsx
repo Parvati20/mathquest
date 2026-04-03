@@ -117,7 +117,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { getProviders, signIn, useSession } from "next-auth/react";
 import BrandLogo from "@/components/BrandLogo";
 
 export default function LoginPage() {
@@ -125,12 +125,31 @@ export default function LoginPage() {
   const { status } = useSession();
 
   const [callbackUrl] = useState("/tool");
+  const [googleAvailable, setGoogleAvailable] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (status === "authenticated") {
       router.replace(callbackUrl);
     }
   }, [router, status, callbackUrl]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    getProviders()
+      .then((providers) => {
+        if (!mounted) return;
+        setGoogleAvailable(Boolean(providers?.google));
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setGoogleAvailable(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   return (
     <main className="min-h-screen bg-[#FAFAFA] font-sans flex flex-col">
@@ -163,13 +182,23 @@ export default function LoginPage() {
             </p>
 
             <button
-              onClick={() => signIn("google", { callbackUrl })}
+              onClick={() => {
+                if (!googleAvailable) return;
+                signIn("google", { callbackUrl });
+              }}
+              disabled={googleAvailable === false}
               className="w-full flex items-center justify-center gap-3 bg-white hover:bg-gray-50 border-2 border-gray-200 hover:border-[#E91E63] text-gray-800 font-bold py-4 px-6 rounded-2xl transition-all hover:shadow-lg hover:shadow-pink-100 active:scale-95 text-base group"
             >
               <Image src="/google.png" alt="Google" width={22} height={22} className="object-contain" />
               <span>Continue with Google</span>
               <span className="ml-auto text-gray-400 group-hover:text-[#E91E63] transition-colors">→</span>
             </button>
+
+            {googleAvailable === false ? (
+              <p className="mt-3 text-xs text-red-500 text-center">
+                Google login is not configured. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env.local.
+              </p>
+            ) : null}
 
             <div className="flex items-center gap-3 my-6">
               <div className="flex-1 h-px bg-gray-100" />

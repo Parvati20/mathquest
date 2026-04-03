@@ -19,6 +19,28 @@ const SESSION_SIZE = 25;
 const LLM_SESSION_SIZE = 20;
 const difficulties: Difficulty[] = ["easy", "medium", "hard"];
 
+function getNextDifficulty(current: Difficulty): Difficulty | null {
+  const currentIndex = difficulties.indexOf(current);
+
+  if (currentIndex === -1 || currentIndex >= difficulties.length - 1) {
+    return null;
+  }
+
+  return difficulties[currentIndex + 1] ?? null;
+}
+
+function getMoveToNextLabel(nextDifficulty: Difficulty, language: string) {
+  if (language === "Hindi") {
+    return nextDifficulty === "medium" ? "मीडियम पर जाएं" : "हार्ड पर जाएं";
+  }
+
+  if (language === "Marathi") {
+    return nextDifficulty === "medium" ? "मध्यमकडे जा" : "कठीणकडे जा";
+  }
+
+  return nextDifficulty === "medium" ? "Move to Medium" : "Move to Hard";
+}
+
 function normalizeQuestionSignature(question: string) {
   return question.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
 }
@@ -240,33 +262,21 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
   }, [cachedSessions, requestGeneratedQuestions, sessionSeed, topic]);
 
   useEffect(() => {
-    if (!finished || savedRef.current) return;
+    if (!finished) return;
     savedRef.current = true;
-    void fetch("/api/progress/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: "practice",
-        topicId: topic,
-        correctCount,
-        totalCount: sessionQuestions.length,
-      }),
-    });
-  }, [finished, topic, correctCount, sessionQuestions.length]);
+  }, [finished]);
 
-  const startNewSession = (nextDifficulty: Difficulty = difficulty) => {
+  const startNewSession = () => {
     savedRef.current = false;
-    if (nextDifficulty === difficulty) {
-      const nextSeed = sessionSeed + 1;
-      setSessionSeed(nextSeed);
 
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(storageSeedKey, String(nextSeed));
-      }
-    } else {
-      setGeneratedSession(cachedSessions[nextDifficulty] ?? null);
-      setDifficulty(nextDifficulty);
+    const nextSeed = sessionSeed + 1;
+    setSessionSeed(nextSeed);
+
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(storageSeedKey, String(nextSeed));
     }
+
+    setDifficulty("easy");
     setIndex(0);
     setSelectedIndex(null);
     setSubmitted(false);
@@ -277,7 +287,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     setAiExplanation("");
     setAiError("");
     setAiLoading(false);
-    setGeneratedSession(null);
+    setGeneratedSession(cachedSessions.easy ?? null);
     setIsGeneratingSession(false);
     setSessionSource("bank");
     setCurrentStreak(0);
@@ -325,7 +335,8 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
   };
 
   const handleDifficulty = (nextDifficulty: Difficulty) => {
-    startNewSession(nextDifficulty);
+    startNewSession();
+    setDifficulty(nextDifficulty);
   };
 
   const handleSubmit = () => {
@@ -334,6 +345,18 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     }
 
     const isCorrect = selectedIndex === currentQuestion.answerIndex;
+
+    void fetch("/api/progress/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      keepalive: true,
+      body: JSON.stringify({
+        type: "practice",
+        topicId: topic,
+        correctCount: isCorrect ? 1 : 0,
+        totalCount: 1,
+      }),
+    });
 
     if (isCorrect) {
       setCorrectCount((prev) => prev + 1);
@@ -365,6 +388,21 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     const isLast = index >= sessionQuestions.length - 1;
 
     if (isLast) {
+      const nextDifficulty = getNextDifficulty(difficulty);
+
+      if (nextDifficulty) {
+        setDifficulty(nextDifficulty);
+        setGeneratedSession(cachedSessions[nextDifficulty] ?? null);
+        setIndex(0);
+        setSelectedIndex(null);
+        setSubmitted(false);
+        setAiExplanation("");
+        setAiError("");
+        setAiLoading(false);
+        setSessionSource(cachedSessions[nextDifficulty]?.length ? "llm" : "bank");
+        return;
+      }
+
       setFinished(true);
       return;
     }
@@ -379,6 +417,8 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
 
   const total = sessionQuestions.length;
   const questionNumber = total > 0 ? index + 1 : 0;
+  const isLastQuestion = index === total - 1;
+  const upcomingDifficulty = getNextDifficulty(difficulty);
   const progressPercent = total > 0 ? Math.round((questionNumber / total) * 100) : 0;
   const marks = correctCount * 4;
   const maxMarks = total * 4;
@@ -444,7 +484,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
 
           <div className="mt-8 flex flex-wrap gap-3">
             <button
-              onClick={() => startNewSession(difficulty)}
+              onClick={() => startNewSession()}
               className="rounded-xl bg-orange-500 px-6 py-3 font-bold text-white transition-colors hover:bg-orange-600"
             >
               {text.morePractice}
@@ -657,7 +697,11 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
                     : "bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#F97316] shadow-[0_16px_34px_rgba(233,30,99,0.24)]"
                 }`}
               >
-                {submitted ? (index === total - 1 ? text.showResult : text.next) : text.submit}
+                {submitted
+                  ? (isLastQuestion
+                    ? (upcomingDifficulty ? getMoveToNextLabel(upcomingDifficulty, language) : text.showResult)
+                    : text.next)
+                  : text.submit}
               </button>
             </div>
           </div>

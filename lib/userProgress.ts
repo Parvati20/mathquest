@@ -243,6 +243,10 @@ export async function savePracticeSession(
             [`topicProgress.${topicId}.attempts`]: safeTotal,
             [`topicProgress.${topicId}.wrong`]: wrongCount,
             [`topicProgress.${topicId}.points`]: points,
+            totalSolved: safeCorrect,
+            totalAttempts: safeTotal,
+            totalWrong: wrongCount,
+            totalPoints: points,
           },
           $push: {
             practiceSessions: {
@@ -263,10 +267,8 @@ export async function savePracticeSession(
           $set: { updatedAt: new Date() },
           $setOnInsert: {
             userId,
-            topicProgress: {},
             mockAttempts: 0,
             mockBestScore: 0,
-            practiceSessions: [],
             mockHistory: [],
           },
         },
@@ -329,10 +331,11 @@ export async function saveMockTest(
           $setOnInsert: {
             userId,
             topicProgress: {},
-            mockAttempts: 0,
-            mockBestScore: 0,
             practiceSessions: [],
-            mockHistory: [],
+            totalSolved: 0,
+            totalAttempts: 0,
+            totalWrong: 0,
+            totalPoints: 0,
           },
         },
         { upsert: true },
