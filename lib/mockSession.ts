@@ -41,10 +41,14 @@ export function getMockTopicTitle(topic: string) {
 }
 
 export function makeQuestionSignature(question: string) {
-  return question.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+  return question.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
-export function buildMockFallbackSession(seed: number, count = MOCK_SESSION_COUNT): MockQuestion[] {
+export function buildMockFallbackSession(
+  seed: number,
+  count = MOCK_SESSION_COUNT,
+  blockedSignatures: string[] = [],
+): MockQuestion[] {
   const topicEntries = Object.entries(questionsData);
   if (topicEntries.length === 0) {
     return [];
@@ -52,12 +56,18 @@ export function buildMockFallbackSession(seed: number, count = MOCK_SESSION_COUN
 
   const basePerTopic = Math.floor(count / topicEntries.length);
   const remainder = count % topicEntries.length;
+  const seen = new Set(
+    blockedSignatures
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
+
   const buckets: MockQuestion[][] = topicEntries.map(([topic, pool], topicIndex) => {
     const topicTitle = getMockTopicTitle(topic);
-    const desiredCount = basePerTopic + (topicIndex < remainder ? 1 : 0);
     const shuffled = seededShuffle(pool, seed + (topicIndex + 1) * 97);
 
-    return shuffled.slice(0, desiredCount).map((question) => ({
+    return shuffled.map((question) => ({
       ...question,
       topic,
       topicTitle,
@@ -71,10 +81,27 @@ export function buildMockFallbackSession(seed: number, count = MOCK_SESSION_COUN
     let pushed = false;
 
     for (const bucket of buckets) {
-      if (bucket[cursor]) {
-        mixed.push(bucket[cursor]);
-        pushed = true;
+      const desiredCount = basePerTopic + (buckets.indexOf(bucket) < remainder ? 1 : 0);
+      const currentTopicCount = mixed.filter((question) => question.topic === bucket[0]?.topic).length;
+
+      if (currentTopicCount >= desiredCount) {
+        continue;
       }
+
+      const candidate = bucket[cursor];
+
+      if (!candidate) {
+        continue;
+      }
+
+      const signature = makeQuestionSignature(candidate.question);
+      if (seen.has(signature)) {
+        continue;
+      }
+
+      seen.add(signature);
+      mixed.push(candidate);
+      pushed = true;
     }
 
     if (!pushed) {
@@ -91,9 +118,15 @@ export function mergeMockQuestions(
   generated: MockQuestion[],
   seed: number,
   count = MOCK_SESSION_COUNT,
+  blockedSignatures: string[] = [],
 ) {
   const merged: MockQuestion[] = [];
-  const seen = new Set<string>();
+  const seen = new Set(
+    blockedSignatures
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean),
+  );
 
   const pushQuestion = (question: MockQuestion) => {
     const signature = makeQuestionSignature(question.question);
@@ -115,7 +148,7 @@ export function mergeMockQuestions(
   }
 
   if (merged.length < count) {
-    const fallback = buildMockFallbackSession(seed, count * 2);
+    const fallback = buildMockFallbackSession(seed, count * 3, Array.from(seen));
 
     for (const question of fallback) {
       if (merged.length >= count) {

@@ -29,6 +29,13 @@ export async function POST(request: Request) {
     }
 
     const language = typeof body.language === "string" && body.language.trim() ? body.language.trim() : "English";
+    const blockedQuestionSignatures = Array.isArray(body.blockedQuestionSignatures)
+      ? body.blockedQuestionSignatures
+          .filter((value: unknown): value is string => typeof value === "string")
+          .map((value: string) => value.trim())
+          .filter(Boolean)
+          .slice(0, 400)
+      : [];
     const variationSeed = normalizeSeed(
       typeof body.variationSeed === "number" || typeof body.variationSeed === "string"
         ? body.variationSeed
@@ -41,13 +48,19 @@ export async function POST(request: Request) {
         count,
         language,
         variationSeed,
+        blockedQuestionSignatures,
       });
 
-      const merged = mergeMockQuestions(generated, variationSeed, count);
-      return NextResponse.json({ questions: merged });
+      const merged = mergeMockQuestions(generated, variationSeed, count, blockedQuestionSignatures);
+      const source = generated.length === 0 ? "bank" : merged.length > generated.length ? "mixed" : "llm";
+
+      return NextResponse.json({ questions: merged, source });
     } catch (error) {
       console.error("Mock test generation error:", error);
-      return NextResponse.json({ questions: buildMockFallbackSession(variationSeed, count) });
+      return NextResponse.json({
+        questions: buildMockFallbackSession(variationSeed, count, blockedQuestionSignatures),
+        source: "bank",
+      });
     }
   } catch (error) {
     console.error("Mock test route error:", error);

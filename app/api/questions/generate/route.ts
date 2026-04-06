@@ -57,6 +57,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ questions });
   } catch (error) {
     console.error("Question generation route error:", error);
-    return NextResponse.json({ error: "Unable to generate questions right now." }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Unable to generate questions right now.",
+        details: error instanceof Error ? error.message : "Unknown server error.",
+      },
+      { status: 500 },
+    );
   }
 }

@@ -10,12 +10,56 @@ import {
   getLocalizedTopicContent,
   getUiText,
 } from "@/lib/language";
-import { buildMockFallbackSession, type MockQuestion } from "@/lib/mockSession";
+import { buildMockFallbackSession, makeQuestionSignature, type MockQuestion } from "@/lib/mockSession";
 import { topicsData } from "@/lib/topicsData";
 
 const MOCK_QUESTION_COUNT = 20;
 const MOCK_DURATION_SECONDS = 15 * 60;
 const MARKS_PER_QUESTION = 4;
+const MOCK_HISTORY_STORAGE_KEY = "mathquest-mock-history";
+
+function readMockQuestionHistory() {
+  if (typeof window === "undefined") {
+    return [] as string[];
+  }
+
+  try {
+    const raw = window.localStorage.getItem(MOCK_HISTORY_STORAGE_KEY);
+    if (!raw) {
+      return [];
+    }
+
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+  } catch {
+    return [];
+  }
+}
+
+function saveMockQuestionHistory(questions: MockQuestion[]) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const existing = readMockQuestionHistory();
+  const merged = new Set(existing);
+
+  for (const question of questions) {
+    merged.add(makeQuestionSignature(question.question));
+  }
+
+  const capped = Array.from(merged).slice(-900);
+
+  try {
+    window.localStorage.setItem(MOCK_HISTORY_STORAGE_KEY, JSON.stringify(capped));
+  } catch {
+    // Ignore localStorage write errors.
+  }
+}
 
 function formatTimer(seconds: number) {
   const mins = Math.floor(seconds / 60)
@@ -60,6 +104,18 @@ function CircularProgressStat({
   );
 }
 
+function getSessionSourceLabel(source: "llm" | "mixed" | "bank", language: string) {
+  if (language === "Hindi") {
+    return source === "llm" ? "AI से" : source === "mixed" ? "AI + बैंक" : "प्रश्न बैंक से";
+  }
+
+  if (language === "Marathi") {
+    return source === "llm" ? "AI कडून" : source === "mixed" ? "AI + प्रश्नसंच" : "प्रश्नसंचातून";
+  }
+
+  return source === "llm" ? "From LLM" : source === "mixed" ? "LLM + Bank" : "From Question Bank";
+}
+
 export default function MockTestClient() {
   const { language } = useLanguage();
   const [sessionSeed, setSessionSeed] = useState(0);
@@ -75,7 +131,7 @@ export default function MockTestClient() {
   const [resultAnimated, setResultAnimated] = useState(false);
   const [sessionQuestions, setSessionQuestions] = useState<MockQuestion[]>([]);
   const [isGeneratingSession, setIsGeneratingSession] = useState(true);
-  const [sessionSource, setSessionSource] = useState<"llm" | "bank">("bank");
+  const [sessionSource, setSessionSource] = useState<"llm" | "mixed" | "bank">("bank");
   const savedRef = useRef(false);
   const text = getUiText(language);
 
@@ -100,6 +156,7 @@ export default function MockTestClient() {
           body: JSON.stringify({
             language,
             variationSeed: sessionSeed,
+            blockedQuestionSignatures: readMockQuestionHistory(),
           }),
         });
         window.clearTimeout(timeout);
@@ -114,18 +171,26 @@ export default function MockTestClient() {
 
         const data = await response.json();
         const questions = Array.isArray(data?.questions) ? (data.questions as MockQuestion[]) : [];
+        const apiSource = data?.source === "llm" || data?.source === "mixed" || data?.source === "bank"
+          ? data.source
+          : "bank";
 
         if (questions.length > 0) {
           setSessionQuestions(questions.slice(0, MOCK_QUESTION_COUNT));
-          setSessionSource("llm");
+          setSessionSource(apiSource);
+          saveMockQuestionHistory(questions);
         } else {
-          setSessionQuestions(buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT));
+          const fallback = buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT, readMockQuestionHistory());
+          setSessionQuestions(fallback);
           setSessionSource("bank");
+          saveMockQuestionHistory(fallback);
         }
       } catch {
         if (!cancelled) {
-          setSessionQuestions(buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT));
+          const fallback = buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT, readMockQuestionHistory());
+          setSessionQuestions(fallback);
           setSessionSource("bank");
+          saveMockQuestionHistory(fallback);
         }
       } finally {
         if (!cancelled) {
@@ -287,9 +352,14 @@ export default function MockTestClient() {
           <div className="absolute right-[-8%] top-[10%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,_rgba(59,130,246,0.08)_0%,_rgba(59,130,246,0.02)_45%,_transparent_74%)] blur-3xl" />
         </div>
 
-        <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
+        <nav className="relative flex flex-wrap items-center justify-between gap-2 border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
           <BrandLogo />
-          <LanguageSelect className="bg-white text-xs sm:text-sm" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className={`rounded-full px-3 py-1 text-[10px] sm:text-xs font-black uppercase tracking-[0.14em] ${sessionSource === "llm" ? "bg-emerald-100 text-emerald-700" : sessionSource === "mixed" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+              {getSessionSourceLabel(sessionSource, language)}
+            </span>
+            <LanguageSelect className="bg-white text-xs sm:text-sm" />
+          </div>
         </nav>
 
         <section className="relative mx-auto flex min-h-[70vh] max-w-3xl items-center justify-center px-4 sm:px-6 py-10 text-center">
@@ -305,7 +375,7 @@ export default function MockTestClient() {
               <div className="h-full w-1/2 animate-pulse rounded-full bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#FF8A65]" />
             </div>
             <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#E91E63]">
-              Fresh session by {sessionSource === "llm" ? "LLM" : "bank fallback"}
+              Fresh session by {sessionSource === "llm" ? "LLM" : sessionSource === "mixed" ? "LLM + bank fallback" : "bank fallback"}
             </p>
           </div>
         </section>
@@ -325,14 +395,19 @@ export default function MockTestClient() {
           <div className="absolute right-[-8%] top-[10%] h-[22rem] w-[22rem] rounded-full bg-[radial-gradient(circle,_rgba(59,130,246,0.08)_0%,_rgba(59,130,246,0.02)_45%,_transparent_74%)] blur-3xl" />
         </div>
 
-        <nav className="relative flex items-center justify-between border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
+        <nav className="relative flex flex-wrap items-center justify-between gap-2 border-b border-white/70 bg-white/70 px-4 sm:px-6 md:px-8 py-3 sm:py-4 backdrop-blur-md">
           <BrandLogo />
-          <Link
-            href="/tool"
-            className="text-xs sm:text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
-          >
-            {text.backToTopics}
-          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <span className={`rounded-full px-3 py-1 text-[10px] sm:text-xs font-black uppercase tracking-[0.14em] ${sessionSource === "llm" ? "bg-emerald-100 text-emerald-700" : sessionSource === "mixed" ? "bg-blue-100 text-blue-700" : "bg-amber-100 text-amber-700"}`}>
+              {getSessionSourceLabel(sessionSource, language)}
+            </span>
+            <Link
+              href="/tool"
+              className="text-xs sm:text-sm font-semibold text-[#E91E63] hover:text-[#c2185b]"
+            >
+              {text.backToTopics}
+            </Link>
+          </div>
         </nav>
 
         <section className="relative mx-auto max-w-5xl px-4 sm:px-6 py-8 sm:py-10">

@@ -29,12 +29,8 @@ export async function getMathExplanation(
             role: "system", 
             content: [
               `You are a helpful NavGurukul math mentor. Reply only in ${language}.`,
-              "Explain in a clear, student-friendly paragraph.",
-              "Use the provided base explanation as the source of truth.",
-              "Do not invent a new method or different numeric result.",
-              "Do not ask new questions.",
-              "The final answer MUST match the provided correct answer exactly.",
-              "Do not output any answer different from the provided correct answer.",
+              "Keep the explanation concise, accurate, and student-friendly.",
+              "Use baseExplanation as source of truth and keep final numeric answer exactly same.",
             ].join(" ")
           },
           { 
@@ -42,15 +38,14 @@ export async function getMathExplanation(
             content: [
               `Topic: ${topic}`,
               `Question: ${question}`,
-              `Options: ${options.join(" | ")}`,
               `Correct Answer (must use exactly): ${correctAnswer}`,
               `Base Explanation (source of truth): ${baseExplanation}`,
-              "Rewrite this base explanation in 4-6 simple readable sentences and end with: Final Answer: <correct answer>",
+              "Rewrite in 2-4 short lines and end with: Final Answer: <correct answer>",
             ].join("\n")
           }
         ],
-        temperature: 0.1,
-        max_tokens: 220,
+        temperature: 0,
+        max_tokens: 120,
       }),
     });
 
@@ -93,77 +88,7 @@ function extractJsonObject(raw: string) {
 }
 
 function normalizeQuestionSignature(question: string) {
-  return question.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
-}
-
-function normalizeTopicKey(topic: string) {
-  const value = topic.trim().toLowerCase();
-
-  if (value.includes("number") && value.includes("pattern")) {
-    return "number-patterns";
-  }
-  if (value.includes("percent")) {
-    return "percentage";
-  }
-  if (value.includes("profit") || value.includes("loss")) {
-    return "profit-loss";
-  }
-  if (value.includes("interest")) {
-    return "simple-interest";
-  }
-  if (value.includes("work") || value.includes("time")) {
-    return "work-time";
-  }
-  if (value.includes("linear") || value.includes("equation")) {
-    return "linear-equations";
-  }
-
-  return value;
-}
-
-function getTopicSpecificGuidelines(topic: string, difficulty: Difficulty) {
-  const topicKey = normalizeTopicKey(topic);
-
-  const topicGuidelines: Record<string, string> = {
-    "number-patterns": [
-      "Focus on non-trivial progression logic: alternating rules, second-difference, multiplicative shifts, mixed operations.",
-      "At medium/hard levels, avoid plain +2/+3 monotonic patterns unless wrapped in deeper logic.",
-      "Include missing-term and reverse-pattern formats.",
-    ].join("\n"),
-    percentage: [
-      "Use realistic word problems: price revision, marks, salary revision, reverse percentage.",
-      "At hard level, include reverse setup where final value is given and original must be inferred.",
-      "Avoid only direct 'x% of y' style when difficulty is medium/hard.",
-    ].join("\n"),
-    "profit-loss": [
-      "Prefer practical commerce scenarios with CP/SP/MP, discount interactions, and actual profit% derivation.",
-      "At hard level, combine at least two business operations (markup + discount or discount + target margin).",
-      "Avoid one-line direct subtraction problems for medium/hard.",
-    ].join("\n"),
-    "simple-interest": [
-      "Use SI, principal, rate, time in both forward and reverse forms.",
-      "At medium/hard levels, include reverse reasoning (find P or R from amount/SI constraints).",
-      "Prefer concise word problems instead of only formula substitution.",
-    ].join("\n"),
-    "work-time": [
-      "Use efficiency/rate logic and combined work equations in word scenarios.",
-      "At hard level, include three-person combinations, partial completion, or reverse efficiency deduction.",
-      "Avoid only direct 1-day-work conversion at medium/hard.",
-    ].join("\n"),
-    "linear-equations": [
-      "Blend algebraic and word-based system setups.",
-      "At medium/hard levels, include two-condition reasoning (sum-difference, age, relation-based equations).",
-      "Avoid only single-step forms like x+5=15 at medium/hard.",
-    ].join("\n"),
-  };
-
-  const strictness = difficulty === "hard"
-    ? "For HARD: every question must require multi-step reasoning; no trivial direct-substitution items."
-    : difficulty === "medium"
-      ? "For MEDIUM: at least one reasoning step beyond direct substitution in each question."
-      : "For EASY: keep exam tone and avoid child-level toy phrasing.";
-
-  return [topicGuidelines[topicKey] ?? "Create topic-faithful questions with varied structures.", strictness].join("\n");
+  return question.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function normalizeGeneratedQuestions(
@@ -221,44 +146,63 @@ function normalizeGeneratedQuestions(
   return normalized;
 }
 
-function getDifficultyGuidelines(difficulty: Difficulty): string {
-  const guidelines: Record<Difficulty, string> = {
-    easy: `EASY Level Requirements:
-- Still exam-style, not child-level
-- One short step or one direct calculation, but phrased like a real test question
-- Use realistic classroom or shop examples, not toy examples
-- Prefer small to medium numbers, but avoid absurdly obvious patterns
-- Examples for Number Pattern: "2, 4, 8, 16, ?" or "3, 6, 12, 24, ?"
-- Examples for Percentage: "What is 20% of 500?" or "10% of a number is 50, find the number"
-- Examples for Profit/Loss: "Bought for 200 and sold for 240, what is the profit?"
-- Keep it short, but not childish
-- Answer should be findable in under 1 minute`,
-    
-    medium: `MEDIUM Level Requirements:
-- Word-based problems with 1-2 steps of reasoning
-- Moderate complexity (need to interpret and calculate)
-- Mixed number ranges (some larger numbers allowed)
-- Examples for Number Pattern: "Find next: 3,7,15,31,?" (requires pattern recognition) or "Find missing: 5,10,?,40,80"
-- Examples for Percentage: "Student scores 80/100, find percentage" or "Price ₹400→₹500, find increase %"
-- Examples for Profit/Loss: "Buy ₹500, sell ₹650, find profit%?" (requires multi-step)
-- Small word problems (1-2 sentences)
-- Answer should be findable in 2-3 minutes`,
-    
-    hard: `HARD Level Requirements:
-  - Complex multi-step word problems with reverse or indirect reasoning
-  - Real-world scenarios requiring logical thinking
-  - Use larger numbers, mixed operations, and non-obvious setups
-  - Avoid routine school-book templates; make each question feel fresh
-  - Examples for Number Pattern: "1, 4, 9, 16, 25, ?" or "2, 3, 6, 15, 42, ?"
-  - Examples for Percentage: "A value becomes 250 after a 25% increase, find the original"
-  - Examples for Profit/Loss: "Bought ₹1000, sold ₹1200, discount applied, actual profit%?"
-  - Examples for Simple Interest: "A sum becomes ₹3000 in 2 years at 10%, find principal"
-  - Examples for Time & Work: "A does 40% of work in 4 days, find total time"
-  - Multi-sentence word problems requiring deeper analysis
-  - Answer should be findable in 4-5 minutes with careful calculation`
-  };
-  
-  return guidelines[difficulty];
+function buildBlockedPatternLine(blockedQuestionSignatures: string[]) {
+  const recent = blockedQuestionSignatures.slice(-10).filter(Boolean);
+
+  if (recent.length === 0) {
+    return "None";
+  }
+
+  return recent.join(" | ");
+}
+
+async function requestNvidiaBatch(prompt: {
+  systemPrompt: string;
+  userPrompt: string;
+  apiKey: string;
+  temperature: number;
+  max_tokens: number;
+  top_p: number;
+}): Promise<string> {
+  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${prompt.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "meta/llama-3.1-8b-instruct",
+      messages: [
+        { role: "system", content: prompt.systemPrompt },
+        { role: "user", content: prompt.userPrompt },
+      ],
+      temperature: prompt.temperature,
+      max_tokens: prompt.max_tokens,
+      top_p: prompt.top_p,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorBody = await response.text();
+    throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
+  }
+
+  const data = await response.json();
+  return String(data?.choices?.[0]?.message?.content ?? "");
+}
+
+function parseNvidiaQuestionBlock(raw: string) {
+  const jsonBlock = extractJsonObject(raw);
+
+  if (!jsonBlock) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(jsonBlock) as { questions?: unknown };
+  } catch {
+    return null;
+  }
 }
 
 export async function generateMathQuestions({
@@ -275,107 +219,63 @@ export async function generateMathQuestions({
     throw new Error("Missing NVIDIA_API_KEY environment variable.");
   }
 
-  const safeCount = Math.min(Math.max(count, 1), 25);
-  const difficultyGuidelines = getDifficultyGuidelines(difficulty);
-  const topicSpecificGuidelines = getTopicSpecificGuidelines(topic, difficulty);
-  const seedHash = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
-  const variationModifier = seedHash % 8;
   const blockedSignatures = new Set(
     blockedQuestionSignatures
       .filter((value): value is string => typeof value === "string")
       .map((value: string) => value.trim())
       .filter(Boolean),
   );
+  const requestId = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
 
-  const systemPrompt = [
-    "You are an expert math tutor for graduation and 12th-pass practice prep.",
-    "Generate UNIQUE, HIGH-QUALITY questions that feel like a real exam.",
-    "Return ONLY valid JSON. No markdown, no extra text, no backticks.",
-    'JSON Schema: {"questions":[{"question":"...","options":["A)...","B)...","C)...","D)..."],"answerIndex":0,"explanation":"..."}]}',
-    "CRITICAL RULES:",
-    "1. Exactly 4 options, all plausible but only ONE correct",
-    "2. answerIndex: 0-3 (correct answer position, vary it across questions)",
-    "3. Each question MUST be completely unique - no copied/similar questions",
-    "4. Options must use format: 'A) ...', 'B) ...', 'C) ...', 'D) ...'",
-    "5. Short explanations (2-3 sentences max)",
-    "6. NO questions you've generated before - be creative with numbers and scenarios",
-    "7. Ensure difficulty matches specifications below",
-    "8. Avoid childish or overly easy patterns; make questions exam-appropriate",
-    "9. Keep the question style varied across the batch; do not reuse the same template",
-    "10. If difficulty is medium or hard, do not generate primary-school direct arithmetic questions",
-  ].join("\n");
+  const safeCount = Math.min(Math.max(count, 1), 25);
+  const systemPrompt = `You are a Math AI. Generate ${safeCount} UNIQUE MCQ questions for "${topic}" at "${difficulty}" level.
+Language: ${language}.
+RULES:
+1. DO NOT repeat these patterns: [${blockedQuestionSignatures.slice(-10).join(" | ")}].
+2. Use random numbers (e.g. ${Math.floor(Math.random() * 90 + 10)}).
+3. Request ID for variation: ${requestId}.
+4. Output ONLY valid JSON.
+Schema: {"questions": [{"question": "...", "options": ["A)...","B)...","C)...","D)..."], "answerIndex": 0, "explanation": "..."}]}`;
 
-  const userPrompt = [
-    `Topic: ${topic}`,
-    `Difficulty: ${difficulty.toUpperCase()}`,
-    `Language: ${language}`,
-    `Request ID: ${seedHash} (ensures variation across requests)`,
-    "",
-    "DIFFICULTY SPECIFICATIONS:",
-    difficultyGuidelines,
-    "",
-    "TOPIC-SPECIFIC SPECIFICATIONS:",
-    topicSpecificGuidelines,
-    blockedSignatures.size > 0
-      ? `Avoid producing questions that match these previously used signatures: ${Array.from(blockedSignatures).slice(0, 80).join(" | ")}`
-      : "Avoid repeating prior textbook templates and keep all questions structurally fresh.",
-    "",
-    `Generate exactly ${safeCount} questions following the above difficulty level.`,
-    "Make questions creative and avoid repetition from typical textbook examples.",
-    "Use REALISTIC numbers and scenarios.",
-    "Ensure answer choices are properly differentiated (wrong options should be plausible mistakes, not absurd).",
-  ].join("\n");
+  const userPrompt = `Generate ${safeCount} fresh MCQ questions now for topic ${topic} at ${difficulty} level. Return valid JSON only.`;
 
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
-      messages: [
-        {
-          role: "system",
-          content: systemPrompt,
-        },
-        {
-          role: "user",
-          content: userPrompt,
-        },
-      ],
-      temperature: 0.82 + (variationModifier * 0.02),
-      max_tokens: 2200,
-      top_p: 0.9,
-    }),
-  });
+  let raw = "";
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
-  } 
-  const data = await response.json();
-  const raw = String(data?.choices?.[0]?.message?.content ?? "");
-  const jsonBlock = extractJsonObject(raw);
-
-  if (!jsonBlock) {
-    return [];
-  }
   try {
-    const parsed = JSON.parse(jsonBlock) as { questions?: unknown };
-    return normalizeGeneratedQuestions(parsed.questions, topic, difficulty, safeCount, blockedSignatures);
-  } catch {
+    raw = await requestNvidiaBatch({
+      systemPrompt,
+      userPrompt,
+      apiKey,
+      temperature: 0.95,
+      max_tokens: 1500,
+      top_p: 0.9,
+    });
+  } catch (error) {
+    console.error("AI Error:", error);
     return [];
   }
+
+  const parsed = parseNvidiaQuestionBlock(raw);
+  if (!parsed) {
+    return [];
+  }
+
+  const questions = normalizeGeneratedQuestions(parsed.questions, topic, difficulty, safeCount, blockedSignatures);
+  return questions;
 }
 
 type GenerateMockQuestionsParams = {
   count: number;
   language?: string;
   variationSeed?: number | string;
+  blockedQuestionSignatures?: string[];
 };
 
-function normalizeMockGeneratedQuestions(questions: unknown, count: number): MockQuestion[] {
+function normalizeMockGeneratedQuestions(
+  questions: unknown,
+  count: number,
+  blockedSignatures: Set<string>,
+): MockQuestion[] {
   if (!Array.isArray(questions)) {
     return [];
   }
@@ -413,7 +313,7 @@ function normalizeMockGeneratedQuestions(questions: unknown, count: number): Moc
     }
 
     const signature = normalizeQuestionSignature(question);
-    if (seenSignatures.has(signature)) {
+    if (seenSignatures.has(signature) || blockedSignatures.has(signature)) {
       continue;
     }
 
@@ -441,6 +341,7 @@ export async function generateMixedMockQuestions({
   count,
   language = "English",
   variationSeed,
+  blockedQuestionSignatures = [],
 }: GenerateMockQuestionsParams): Promise<MockQuestion[]> {
   const apiKey = process.env.NVIDIA_API_KEY;
 
@@ -451,22 +352,29 @@ export async function generateMixedMockQuestions({
   const safeCount = Math.min(Math.max(count, 1), 20);
   const seedHash = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
   const requestId = seedHash % 100000;
+  const blockedSignatures = new Set(
+    blockedQuestionSignatures
+      .filter((value): value is string => typeof value === "string")
+      .map((value: string) => value.trim())
+      .filter(Boolean),
+  );
 
   const systemPrompt = [
-    "You are an expert math tutor writing a mixed mock test for graduation and 12th-pass practice.",
+    "You are a Math AI for NavGurukul mock tests.",
     `Reply only in ${language}.`,
-    "Return only valid JSON with no markdown or extra text.",
-    'JSON Schema: {"questions":[{"topic":"...","topicTitle":"...","difficulty":"medium|hard","question":"...","options":["A)...","B)...","C)...","D)..."],"answerIndex":0,"explanation":"..."}]}',
-    "Every question must be unique, exam-like, and clearly different from the others in the batch.",
-    "Do not generate child-level or toy questions.",
-    "Use varied structures: reverse reasoning, multi-step calculations, and realistic word problems.",
-    "Avoid repeating the same question template with only number changes.",
-    "All options must be plausible.",
+    "Return only valid JSON and nothing else.",
+    'Schema: {"questions":[{"topic":"...","topicTitle":"...","difficulty":"medium|hard","question":"...","options":["A)...","B)...","C)...","D)..."],"answerIndex":0,"explanation":"..."}]}',
+    "Rules:",
+    "1. Every question must be unique and exam-like.",
+    "2. Use varied structures and realistic word problems.",
+    "3. Do not repeat the same template with only number changes.",
+    "4. All options must be plausible.",
   ].join(" ");
 
   const userPrompt = [
-    "Generate exactly 20 mixed mock-test questions.",
+    `Generate exactly ${count} mixed mock-test questions.`,
     `Request ID: ${requestId}`,
+    `Do not repeat these patterns: [${buildBlockedPatternLine(blockedQuestionSignatures)}].`,
     "Use these exact topic counts:",
     "- number-patterns: 4 questions (2 medium, 2 hard)",
     "- percentage: 4 questions (2 medium, 2 hard)",
@@ -492,7 +400,7 @@ export async function generateMixedMockQuestions({
         { role: "system", content: systemPrompt },
         { role: "user", content: userPrompt },
       ],
-      temperature: 0.88 + ((seedHash % 5) * 0.02),
+      temperature: 0.95,
       top_p: 0.92,
       max_tokens: 3200,
     }),
@@ -513,8 +421,9 @@ export async function generateMixedMockQuestions({
 
   try {
     const parsed = JSON.parse(jsonBlock) as { questions?: unknown };
-    return normalizeMockGeneratedQuestions(parsed.questions, safeCount);
+    return normalizeMockGeneratedQuestions(parsed.questions, safeCount, blockedSignatures);
   } catch {
     return [];
   }
 }
+

@@ -6,17 +6,15 @@ import BrandLogo from "@/components/BrandLogo";
 import LanguageSelect from "@/components/LanguageSelect";
 import { useLanguage } from "@/components/LanguageProvider";
 import { getLocalizedDifficultyLabel, getLocalizedQuestion, getLocalizedTopicContent, getUiText } from "@/lib/language";
-import { seededShuffle } from "@/lib/mockSession";
 import { topicsData } from "@/lib/topicsData";
 import type { Difficulty, TopicQuestion } from "@/lib/questionsData";
 
 type TopicPracticeClientProps = {
   topic: string;
-  questions: TopicQuestion[];
 };
 
-const SESSION_SIZE = 25;
-const LLM_SESSION_SIZE = 20;
+const LLM_SESSION_SIZE = 12;
+const LLM_REQUEST_TIMEOUT_MS = 60000;
 const difficulties: Difficulty[] = ["easy", "medium", "hard"];
 
 function getNextDifficulty(current: Difficulty): Difficulty | null {
@@ -41,8 +39,20 @@ function getMoveToNextLabel(nextDifficulty: Difficulty, language: string) {
   return nextDifficulty === "medium" ? "Move to Medium" : "Move to Hard";
 }
 
+function getSessionSourceLabel(source: "llm", language: string) {
+  if (language === "Hindi") {
+    return "AI से";
+  }
+
+  if (language === "Marathi") {
+    return "AI कडून";
+  }
+
+  return "From LLM";
+}
+
 function normalizeQuestionSignature(question: string) {
-  return question.toLowerCase().replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+  return question.toLowerCase().replace(/\s+/g, " ").trim();
 }
 
 function getHistoryStorageKey(topic: string, difficulty: Difficulty) {
@@ -92,15 +102,7 @@ function saveQuestionHistory(topic: string, difficulty: Difficulty, questions: T
   }
 }
 
-function pickSession<T>(items: T[], count: number, seed: number) {
-  if (items.length === 0) {
-    return [];
-  }
-
-  return seededShuffle(items, seed).slice(0, Math.min(count, items.length));
-}
-
-export default function TopicPracticeClient({ topic, questions }: TopicPracticeClientProps) {
+export default function TopicPracticeClient({ topic }: TopicPracticeClientProps) {
   const { language } = useLanguage();
   const [difficulty, setDifficulty] = useState<Difficulty>("easy");
   const [sessionSeed, setSessionSeed] = useState(0);
@@ -117,20 +119,16 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
   const [generatedSession, setGeneratedSession] = useState<TopicQuestion[] | null>(null);
   const [cachedSessions, setCachedSessions] = useState<Partial<Record<Difficulty, TopicQuestion[]>>>({});
   const [isGeneratingSession, setIsGeneratingSession] = useState(false);
-  const [sessionSource, setSessionSource] = useState<"llm" | "bank">("bank");
+  const [sessionSource, setSessionSource] = useState<"llm">("llm");
   const [currentStreak, setCurrentStreak] = useState(0);
   const [mouseX, setMouseX] = useState(0.5);
   const [mouseY, setMouseY] = useState(0.5);
   const savedRef = useRef(false);
   const text = getUiText(language);
+  const [generationError, setGenerationError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
-  const pool = useMemo(
-    () => questions.filter((question) => question.difficulty === difficulty),
-    [difficulty, questions],
-  );
-
-  const fallbackSession = useMemo(() => pickSession(pool, SESSION_SIZE, sessionSeed), [pool, sessionSeed]);
-  const sessionQuestions = generatedSession && generatedSession.length > 0 ? generatedSession : fallbackSession;
+  const sessionQuestions = generatedSession ?? [];
   const currentQuestion = sessionQuestions[index];
   const localizedTopic = getLocalizedTopicContent(topic as keyof typeof topicsData, language);
   const localizedCurrentQuestion = currentQuestion ? getLocalizedQuestion(currentQuestion, language) : null;
@@ -143,26 +141,37 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
       variationSeed: number,
       signal: AbortSignal,
     ): Promise<TopicQuestion[]> => {
-      const response = await fetch("/api/questions/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal,
-        body: JSON.stringify({
-          topic,
-          difficulty: targetDifficulty,
-          count: LLM_SESSION_SIZE,
-          language,
-          variationSeed,
-          blockedQuestionSignatures: readQuestionHistory(topic, targetDifficulty),
-        }),
-      });
+      try {
+        const response = await fetch("/api/questions/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal,
+          body: JSON.stringify({
+            topic,
+            difficulty: targetDifficulty,
+            count: LLM_SESSION_SIZE,
+            language,
+            variationSeed,
+            blockedQuestionSignatures: readQuestionHistory(topic, targetDifficulty),
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error("Question generation request failed.");
+        const data = await response.json().catch(() => null);
+
+        if (!response.ok) {
+          const errorMessage = typeof data?.error === "string" ? data.error : "Question generation request failed.";
+          const detailMessage = typeof data?.details === "string" ? data.details : "No server details available.";
+          throw new Error(`${errorMessage} (${response.status}) - ${detailMessage}`);
+        }
+
+        return Array.isArray(data?.questions) ? (data.questions as TopicQuestion[]) : [];
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          throw new Error(`LLM request timed out after ${Math.round(LLM_REQUEST_TIMEOUT_MS / 1000)} seconds.`);
+        }
+
+        throw error instanceof Error ? error : new Error("Unknown question generation error.");
       }
-
-      const data = await response.json();
-      return Array.isArray(data?.questions) ? (data.questions as TopicQuestion[]) : [];
     },
     [language, topic],
   );
@@ -185,47 +194,59 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     }
   }, [storageSeedKey]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const fetchGeneratedSession = useCallback(async (seedOverride?: number) => {
+    const seed = seedOverride ?? sessionSeed;
 
-    const fetchGeneratedSession = async () => {
-      setIsGeneratingSession(true);
+    setIsGeneratingSession(true);
+    setGenerationError(null);
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 7000);
-        const generated = await requestGeneratedQuestions(difficulty, sessionSeed, controller.signal);
-        clearTimeout(timeout);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
+      let generated = await requestGeneratedQuestions(difficulty, seed, controller.signal);
 
-        if (cancelled) {
-          return;
-        }
-
-        if (generated.length > 0) {
-          setGeneratedSession(generated);
-          setCachedSessions((prev) => ({ ...prev, [difficulty]: generated }));
-          saveQuestionHistory(topic, difficulty, generated);
-          setSessionSource("llm");
-        } else {
-          setSessionSource("bank");
-        }
-      } catch {
-        if (!cancelled) {
-          setSessionSource("bank");
-        }
-      } finally {
-        if (!cancelled) {
-          setIsGeneratingSession(false);
-        }
+      if (generated.length === 0) {
+        generated = await requestGeneratedQuestions(difficulty, seed + 31, controller.signal);
       }
-    };
+
+      clearTimeout(timeout);
+
+      if (!mountedRef.current) {
+        return generated;
+      }
+
+      if (generated.length > 0) {
+        setGeneratedSession(generated);
+        setCachedSessions((prev) => ({ ...prev, [difficulty]: generated }));
+        saveQuestionHistory(topic, difficulty, generated);
+        setSessionSource("llm");
+        return generated;
+      }
+
+      setGenerationError("LLM did not return enough questions. Please retry.");
+      return [];
+      } catch (error) {
+      if (mountedRef.current) {
+          setGenerationError(error instanceof Error ? error.message : "LLM question generation failed. Please retry.");
+      }
+
+      return [];
+    } finally {
+      if (mountedRef.current) {
+        setIsGeneratingSession(false);
+      }
+    }
+  }, [difficulty, requestGeneratedQuestions, sessionSeed, topic]);
+
+  useEffect(() => {
+    mountedRef.current = true;
 
     void fetchGeneratedSession();
 
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
     };
-  }, [difficulty, requestGeneratedQuestions, sessionSeed, topic]);
+  }, [fetchGeneratedSession]);
 
   useEffect(() => {
     let cancelled = false;
@@ -287,9 +308,9 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     setAiExplanation("");
     setAiError("");
     setAiLoading(false);
-    setGeneratedSession(cachedSessions.easy ?? null);
-    setIsGeneratingSession(false);
-    setSessionSource("bank");
+    setGeneratedSession(null);
+    setGenerationError(null);
+    setSessionSource("llm");
     setCurrentStreak(0);
   };
 
@@ -299,9 +320,10 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     correctAnswer: string,
     baseExplanation: string,
   ) => {
+    // Show a quick local explanation immediately while AI response is loading.
+    setAiExplanation(baseExplanation || `Final Answer: ${correctAnswer}`);
     setAiLoading(true);
     setAiError("");
-    setAiExplanation("");
 
     try {
       const response = await fetch("/api/explain", {
@@ -325,7 +347,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
         throw new Error(data?.error || "Failed to fetch AI explanation.");
       }
 
-      setAiExplanation(data?.explanation || "No explanation returned by AI.");
+      setAiExplanation(data?.explanation || baseExplanation || "No explanation returned by AI.");
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to fetch AI explanation.";
       setAiError(message);
@@ -366,8 +388,8 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
       setAiError("");
       setAiLoading(false);
     } else {
-      setWrongCount((prev) => prev + 1);
       setCurrentStreak(0);
+      setWrongCount((prev) => prev + 1);
       const fallbackOptions = currentQuestion.options;
       const localizedOptions = localizedCurrentQuestion?.options ?? fallbackOptions;
       const correctAnswer = localizedOptions[currentQuestion.answerIndex] ?? String(fallbackOptions[currentQuestion.answerIndex] ?? "");
@@ -399,7 +421,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
         setAiExplanation("");
         setAiError("");
         setAiLoading(false);
-        setSessionSource(cachedSessions[nextDifficulty]?.length ? "llm" : "bank");
+        setSessionSource("llm");
         return;
       }
 
@@ -427,15 +449,41 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
   const liveAccuracy = attemptedCount > 0 ? Math.round((correctCount / attemptedCount) * 100) : 100;
   const xpGained = correctCount * 30 + currentStreak * 5;
 
-  if (total === 0) {
+  if (generationError) {
     return (
       <main className="min-h-screen bg-[#FFFBF5] font-sans">
         <div className="mx-auto max-w-3xl px-6 py-12">
-          <h1 className="text-2xl font-black text-gray-800">{text.noQuestions}</h1>
-          <p className="mt-2 text-sm text-gray-500">{text.addQuestions}</p>
-          <Link href={`/${topic}`} className="mt-4 inline-block text-sm font-semibold text-orange-500 hover:text-orange-600">
-            {text.learnConcept}
-          </Link>
+          <h1 className="text-2xl font-black text-gray-800">LLM failed to generate questions.</h1>
+          <p className="mt-2 text-sm text-gray-500">{generationError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              void fetchGeneratedSession(sessionSeed + 101);
+            }}
+            className="mt-4 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
+          >
+            Retry LLM
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (isGeneratingSession || total === 0) {
+    return (
+      <main className="min-h-screen bg-[#FFFBF5] font-sans">
+        <div className="mx-auto max-w-3xl px-6 py-12">
+          <h1 className="text-2xl font-black text-gray-800">Generating LLM questions...</h1>
+          <p className="mt-2 text-sm text-gray-500">Please wait while NVIDIA Llama 3.1 creates a fresh session.</p>
+          <button
+            type="button"
+            onClick={() => {
+              void fetchGeneratedSession(sessionSeed + 101);
+            }}
+            className="mt-4 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
+          >
+            Retry LLM
+          </button>
         </div>
       </main>
     );
@@ -529,11 +577,16 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
         />
       </div>
 
-      <nav className="relative flex items-center justify-between border-b border-pink-100 bg-white/80 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl">
+      <nav className="relative flex flex-wrap items-center justify-between gap-2 border-b border-pink-100 bg-white/80 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl">
         <BrandLogo />
-        <Link href={`/${topic}`} className="text-sm font-semibold text-[#E91E63] hover:text-pink-700">
-          {text.learnConcept}
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-full px-3 py-1 text-[10px] sm:text-xs font-black uppercase tracking-[0.14em] bg-emerald-100 text-emerald-700">
+            {getSessionSourceLabel(sessionSource, language)}
+          </span>
+          <Link href={`/${topic}`} className="text-sm font-semibold text-[#E91E63] hover:text-pink-700">
+            {text.learnConcept}
+          </Link>
+        </div>
       </nav>
 
       <section className="relative mx-auto max-w-6xl px-4 sm:px-6 py-8 sm:py-10 pb-28">
@@ -574,7 +627,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
               />
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
               <span>{text.correct}: {correctCount}</span>
               <span>{text.wrong}: {wrongCount}</span>
             </div>
@@ -582,12 +635,25 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
             <p className="mt-3 text-xs font-medium">
           {isGeneratingSession ? (
             <span className="text-sky-300">⏳ {text.generatingQuestions}</span>
-          ) : sessionSource === "llm" ? (
-            <span className="text-emerald-300">🤖 {text.aiRoundActive}</span>
           ) : (
-            <span className="text-amber-300">📚 {text.fallbackBank}</span>
+            <span className="text-emerald-300">🤖 {text.aiRoundActive}</span>
           )}
             </p>
+
+            {generationError ? (
+              <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p className="font-bold">{generationError}</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void fetchGeneratedSession(sessionSeed + 101);
+                  }}
+                  className="mt-3 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
+                >
+                  Retry LLM
+                </button>
+              </div>
+            ) : null}
 
             <article className="relative mt-6 overflow-hidden rounded-[2rem] border border-pink-100 bg-white/90 p-4 sm:p-6 shadow-xl backdrop-blur-sm">
           {burstTick > 0 && submitted && isCorrect ? (
@@ -724,3 +790,7 @@ export default function TopicPracticeClient({ topic, questions }: TopicPracticeC
     </main>
   );
 }
+
+
+
+
