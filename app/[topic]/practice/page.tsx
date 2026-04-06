@@ -2,7 +2,6 @@ import { getServerSession } from "next-auth";
 import { notFound } from "next/navigation";
 import { redirect } from "next/navigation";
 import TopicPracticeClient from "@/components/TopicPracticeClient";
-import { questionsData } from "@/lib/questionsData";
 import { topicsData } from "@/lib/topicsData";
 import { authOptions } from "@/lib/next-auth";
 
@@ -19,11 +18,10 @@ export default async function TopicPracticePage({ params }: PageProps) {
   }
 
   const topicInfo = topicsData[topic as keyof typeof topicsData];
-  const questions = questionsData[topic];
 
-  if (!topicInfo || !questions || questions.length === 0) {
+  if (!topicInfo) {
     return notFound();
   }
 
-  return <TopicPracticeClient topic={topic} questions={questions} />;
+  return <TopicPracticeClient topic={topic} />;
 }
