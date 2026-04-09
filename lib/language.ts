@@ -27,11 +27,11 @@ export const uiText = {
     showResult: "Show Results",
     aiMentor: "AI Mentor",
     generating: "Thinking...",
-    generatingQuestions: "Generating AI Questions...",
+    generatingQuestions: "Generating questions...",
     noQuestions: "No questions found.",
     addQuestions: "Please check back later or try a different topic.",
     fallbackBank: "Using question bank (Offline Mode)",
-    aiRoundActive: "AI Round Active",
+    aiRoundActive: "Practice session active",
     backToTopics: "Back to Topics",
     theory: "Theory",
     formula: "Formula",
@@ -86,11 +86,11 @@ export const uiText = {
     showResult: "परिणाम देखें",
     aiMentor: "AI गुरु",
     generating: "सोच रहा हूँ...",
-    generatingQuestions: "AI प्रश्न बना रहा है...",
+    generatingQuestions: "प्रश्न बनाए जा रहे हैं...",
     noQuestions: "प्रश्न नहीं मिले।",
     addQuestions: "कृपया बाद में देखें या कोई और विषय चुनें।",
     fallbackBank: "प्रश्न बैंक (ऑफलाइन मोड)",
-    aiRoundActive: "AI राउंड सक्रिय",
+    aiRoundActive: "सत्र सक्रिय",
     backToTopics: "विषयों पर वापस",
     theory: "सिद्धांत",
     formula: "सूत्र",
@@ -145,11 +145,11 @@ export const uiText = {
     showResult: "निकाल पाहा",
     aiMentor: "AI मार्गदर्शक",
     generating: "विचार चालू आहे...",
-    generatingQuestions: "AI प्रश्न तयार करत आहे...",
+    generatingQuestions: "प्रश्न तयार होत आहेत...",
     noQuestions: "प्रश्न सापडले नाहीत.",
     addQuestions: "कृपया नंतर पुन्हा प्रयत्न करा किंवा दुसरा विषय निवडा.",
     fallbackBank: "प्रश्नसंच वापरला जात आहे (ऑफलाइन मोड)",
-    aiRoundActive: "AI राउंड सक्रिय",
+    aiRoundActive: "सत्र सक्रिय",
     backToTopics: "विषयांकडे परत",
     theory: "सिद्धांत",
     formula: "सूत्र",
@@ -332,68 +332,10 @@ function localizeGeneratedQuestionText(text: string, language: AppLanguage): str
   if (language === "English") {
     return text;
   }
-
-  const replace = (source: string, english: string, hindi: string, marathi: string) => {
-    if (language === "Hindi") {
-      return source.replace(english, hindi);
-    }
-
-    return source.replace(english, marathi);
-  };
-
-  let localized = text;
-
-  localized = replace(localized, "What comes next:", "अगली संख्या क्या होगी:", "पुढची संख्या कोणती:");
-  localized = replace(localized, "Find the next term:", "अगला पद ज्ञात करें:", "पुढचा पद शोधा:");
-  localized = replace(localized, "What is ", "क्या है ", "किती आहे ");
-  localized = replace(localized, " is what percent of ", " , का कितने प्रतिशत है ", " हे ");
-  localized = replace(localized, "After a ", "यदि ", "जर ");
-  localized = replace(localized, "% increase, a value becomes ", "% बढ़ोतरी के बाद मान ", "% वाढीनंतर मूल्य ");
-  localized = replace(localized, ". Original value is", " हो जाता है। मूल मान है", " होते. मूळ मूल्य आहे");
-  localized = replace(localized, "If A does 1/", "यदि A एक दिन में 1/", "जर A एका दिवशी 1/");
-  localized = replace(localized, " of work in one day, A alone finishes the work in how many days?", " काम करता है, तो A अकेला काम कितने दिनों में पूरा करेगा?", " काम करतो, तर A एकट्याने काम किती दिवसांत पूर्ण करेल?");
-  localized = replace(localized, "A can finish a work in ", "A एक काम ", "A एक काम ");
-  localized = replace(localized, " days and B in ", " दिनों में और B ", " दिवसांत आणि B ");
-  localized = replace(localized, " days. Together they finish in how many days?", " दिनों में करता है। साथ में कितने दिन लगेंगे?", " दिवसांत करतो. दोघांना मिळून किती दिवस लागतील?");
-  localized = replace(localized, "A and B together finish a work in ", "A और B मिलकर एक काम ", "A आणि B मिळून एक काम ");
-  localized = replace(localized, " days. A alone takes ", " दिनों में करते हैं। A अकेला ", " दिवसांत करतात. A एकटा ");
-  localized = replace(localized, " days. B alone takes", " दिन लेता है। B अकेला लेगा", " दिवस घेतो. B एकटा घेईल");
-  localized = replace(localized, "If x + y = ", "यदि x + y = ", "जर x + y = ");
-  localized = replace(localized, " and y = ", " और y = ", " आणि y = ");
-  localized = replace(localized, ", then x = ?", ", तो x = ?", ", तर x = ?");
-  localized = replace(localized, "Solve for x:", "x के लिए हल करें:", "x साठी सोडवा:");
-  localized = replace(localized, "If ", "यदि ", "जर ");
-  localized = replace(localized, " then y = ?", " तो y = ?", " तर y = ?");
-  localized = replace(localized, "Find simple interest:", "सरल ब्याज ज्ञात करें:", "साधे व्याज शोधा:");
-  localized = replace(localized, " years", " वर्ष", " वर्षे");
-  localized = replace(localized, "rate=", "दर=", "दर=");
-  localized = replace(localized, " and time=", " और समय=", " आणि वेळ=");
-  localized = replace(localized, ", principal is", ", मूलधन है", ", मूळ रक्कम आहे");
-  localized = replace(localized, "At what rate (in %) will principal ", "किस दर (%) पर मूलधन ", "कोणत्या दराने (%) मूळ रक्कम ");
-  localized = replace(localized, " double in ", " , में दोगुना होगा ", " , मध्ये दुप्पट होईल ");
-  localized = replace(localized, " on simple interest?", " सरल ब्याज पर?", " साध्या व्याजावर?");
-  localized = replace(localized, "If CP=", "यदि CP=", "जर CP=");
-  localized = replace(localized, " and SP=", " और SP=", " आणि SP=");
-  localized = replace(localized, ", profit is", ", लाभ है", ", नफा आहे");
-  localized = replace(localized, "An item of CP=", "CP= वाली वस्तु ", "CP= असलेली वस्तू ");
-  localized = replace(localized, " is sold at ", " को ", " ला ");
-  localized = replace(localized, "% profit. Profit amount is", "% लाभ पर बेचा गया। लाभ राशि है", "% नफ्यावर विकली. नफा रक्कम आहे");
-  localized = replace(localized, "An item is sold for ", "एक वस्तु ", "एक वस्तू ");
-  localized = replace(localized, " at ", " पर ", " वर ");
-  localized = replace(localized, "% loss. Cost price is", "% हानि पर बेची गई। क्रय मूल्य है", "% तोट्यावर विकली. खरेदी किंमत आहे");
-
-  // Special handling for: "X is what percent of Y?"
-  if (language === "Hindi") {
-    localized = localized.replace(/^(\d+)\s*, का कितने प्रतिशत है\s*(\d+)\?$/i, "$1, $2 का कितने प्रतिशत है?");
-  }
-  if (language === "Marathi") {
-    localized = localized.replace(/^(\d+)\s*हे\s*(\d+)\?$/i, "$1 हे $2 चे किती टक्के आहे?");
-  }
-
-  return localized;
+  return text.replace(/\$/g, "₹");
 }
 export function getLocalizedQuestion<T extends {
-  translations?: Partial<Record<AppLanguage, { question: string; options: string[]; explanation: string }>>;
+  translations?: Partial<Record<AppLanguage, { question?: string; options?: string[]; explanation?: string }>>;
   question: string;
   options: string[];
   explanation: string;
@@ -411,14 +353,16 @@ export function getLocalizedQuestion<T extends {
     return {
       ...question,
       question: localizeGeneratedQuestionText(question.question, language),
+      options: question.options.map((option) => localizeGeneratedQuestionText(option, language)),
+      explanation: localizeGeneratedQuestionText(question.explanation, language),
     };
   }
 
   return {
     ...question,
-    question: translated.question,
-    options: translated.options,
-    explanation: translated.explanation,
+    question: translated.question ?? question.question,
+    options: translated.options ?? question.options,
+    explanation: translated.explanation ?? question.explanation,
   };
 }
 

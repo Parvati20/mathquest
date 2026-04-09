@@ -13,9 +13,11 @@ type TopicPracticeClientProps = {
   topic: string;
 };
 
-const LLM_SESSION_SIZE = 12;
-const LLM_REQUEST_TIMEOUT_MS = 60000;
+const LLM_SESSION_SIZE = 10;
+const LLM_REQUEST_TIMEOUT_MS = 130000;
 const difficulties: Difficulty[] = ["easy", "medium", "hard"];
+const practiceGenerationCache = new Map<string, TopicQuestion[]>();
+const practiceGenerationInFlight = new Map<string, Promise<TopicQuestion[]>>();
 
 function getNextDifficulty(current: Difficulty): Difficulty | null {
   const currentIndex = difficulties.indexOf(current);
@@ -37,18 +39,6 @@ function getMoveToNextLabel(nextDifficulty: Difficulty, language: string) {
   }
 
   return nextDifficulty === "medium" ? "Move to Medium" : "Move to Hard";
-}
-
-function getSessionSourceLabel(source: "llm", language: string) {
-  if (language === "Hindi") {
-    return "AI से";
-  }
-
-  if (language === "Marathi") {
-    return "AI कडून";
-  }
-
-  return "From LLM";
 }
 
 function normalizeQuestionSignature(question: string) {
@@ -117,9 +107,8 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
   const [generatedSession, setGeneratedSession] = useState<TopicQuestion[] | null>(null);
-  const [cachedSessions, setCachedSessions] = useState<Partial<Record<Difficulty, TopicQuestion[]>>>({});
+  const [cachedSessions, setCachedSessions] = useState<Record<string, TopicQuestion[]>>({});
   const [isGeneratingSession, setIsGeneratingSession] = useState(false);
-  const [sessionSource, setSessionSource] = useState<"llm">("llm");
   const [currentStreak, setCurrentStreak] = useState(0);
   const [mouseX, setMouseX] = useState(0.5);
   const [mouseY, setMouseY] = useState(0.5);
@@ -127,6 +116,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
   const text = getUiText(language);
   const [generationError, setGenerationError] = useState<string | null>(null);
   const mountedRef = useRef(true);
+  const [isSeedReady, setIsSeedReady] = useState(false);
 
   const sessionQuestions = generatedSession ?? [];
   const currentQuestion = sessionQuestions[index];
@@ -134,6 +124,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
   const localizedCurrentQuestion = currentQuestion ? getLocalizedQuestion(currentQuestion, language) : null;
 
   const storageSeedKey = useMemo(() => `mathquest-practice-seed:${topic}:${difficulty}`, [topic, difficulty]);
+  const difficultyLanguageKey = `${difficulty}:${language}`;
 
   const requestGeneratedQuestions = useCallback(
     async (
@@ -167,7 +158,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
         return Array.isArray(data?.questions) ? (data.questions as TopicQuestion[]) : [];
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") {
-          throw new Error(`LLM request timed out after ${Math.round(LLM_REQUEST_TIMEOUT_MS / 1000)} seconds.`);
+          throw new Error(`Question generation timed out after ${Math.round(LLM_REQUEST_TIMEOUT_MS / 1000)} seconds.`);
         }
 
         throw error instanceof Error ? error : new Error("Unknown question generation error.");
@@ -182,119 +173,140 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     }
 
     try {
+      const initFlagKey = `mathquest-practice-init:${topic}`;
+      const alreadyInitialized = window.sessionStorage.getItem(initFlagKey) === "1";
+      if (alreadyInitialized) {
+        const rawSeed = window.localStorage.getItem(storageSeedKey);
+        const parsedSeed = rawSeed ? Number.parseInt(rawSeed, 10) : 0;
+        setSessionSeed(Number.isFinite(parsedSeed) ? parsedSeed : 0);
+        setIsSeedReady(true);
+        return;
+      }
+
       const rawSeed = window.localStorage.getItem(storageSeedKey);
       const parsedSeed = rawSeed ? Number.parseInt(rawSeed, 10) : 0;
       const safeSeed = Number.isFinite(parsedSeed) ? parsedSeed : 0;
       const nextSeed = safeSeed + 1;
 
       window.localStorage.setItem(storageSeedKey, String(nextSeed));
+      window.sessionStorage.setItem(initFlagKey, "1");
       setSessionSeed(nextSeed);
+      setIsSeedReady(true);
     } catch {
       // If storage access fails (privacy mode), keep current in-memory seed.
+      setIsSeedReady(true);
     }
-  }, [storageSeedKey]);
+  }, [storageSeedKey, topic]);
 
   const fetchGeneratedSession = useCallback(async (seedOverride?: number) => {
+    if (!isSeedReady && seedOverride === undefined) {
+      return [];
+    }
+
     const seed = seedOverride ?? sessionSeed;
+    const requestKey = `${topic}:${difficulty}:${language}:${seed}`;
+
+    const cachedSession = practiceGenerationCache.get(requestKey);
+    if (cachedSession) {
+      if (mountedRef.current) {
+        setGeneratedSession(cachedSession);
+        setGenerationError(null);
+        setIsGeneratingSession(false);
+      }
+
+      return cachedSession;
+    }
+
+    const inFlightSession = practiceGenerationInFlight.get(requestKey);
+    if (inFlightSession) {
+      return inFlightSession;
+    }
+
+    if (seedOverride === undefined && cachedSessions[difficultyLanguageKey]?.length) {
+      if (mountedRef.current) {
+        setGeneratedSession(cachedSessions[difficultyLanguageKey] ?? null);
+        setGenerationError(null);
+        setIsGeneratingSession(false);
+      }
+
+      return cachedSessions[difficultyLanguageKey] ?? [];
+    }
 
     setIsGeneratingSession(true);
     setGenerationError(null);
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
-      let generated = await requestGeneratedQuestions(difficulty, seed, controller.signal);
+    const requestPromise = (async () => {
+      try {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), LLM_REQUEST_TIMEOUT_MS);
+        const generated = await requestGeneratedQuestions(difficulty, seed, controller.signal);
+        clearTimeout(timeout);
 
-      if (generated.length === 0) {
-        generated = await requestGeneratedQuestions(difficulty, seed + 31, controller.signal);
-      }
+        if (!mountedRef.current) {
+          return generated;
+        }
 
-      clearTimeout(timeout);
+        if (generated.length > 0) {
+          practiceGenerationCache.set(requestKey, generated);
+          setGeneratedSession(generated);
+          setCachedSessions((prev) => ({ ...prev, [difficultyLanguageKey]: generated }));
+          saveQuestionHistory(topic, difficulty, generated);
+          return generated;
+        }
 
-      if (!mountedRef.current) {
-        return generated;
-      }
-
-      if (generated.length > 0) {
-        setGeneratedSession(generated);
-        setCachedSessions((prev) => ({ ...prev, [difficulty]: generated }));
-        saveQuestionHistory(topic, difficulty, generated);
-        setSessionSource("llm");
-        return generated;
-      }
-
-      setGenerationError("LLM did not return enough questions. Please retry.");
-      return [];
+        setGenerationError("The question set is incomplete. Please retry.");
+        return [];
       } catch (error) {
-      if (mountedRef.current) {
-          setGenerationError(error instanceof Error ? error.message : "LLM question generation failed. Please retry.");
-      }
+        if (mountedRef.current) {
+          setGenerationError(error instanceof Error ? error.message : "Question generation failed. Please retry.");
+        }
 
-      return [];
-    } finally {
-      if (mountedRef.current) {
-        setIsGeneratingSession(false);
+        return [];
+      } finally {
+        if (mountedRef.current) {
+          setIsGeneratingSession(false);
+        }
+
+        practiceGenerationInFlight.delete(requestKey);
       }
-    }
-  }, [difficulty, requestGeneratedQuestions, sessionSeed, topic]);
+    })();
+
+    practiceGenerationInFlight.set(requestKey, requestPromise);
+    return requestPromise;
+  }, [cachedSessions, difficulty, difficultyLanguageKey, isSeedReady, language, requestGeneratedQuestions, sessionSeed, topic]);
 
   useEffect(() => {
     mountedRef.current = true;
+
+    if (!isSeedReady) {
+      return () => {
+        mountedRef.current = false;
+      };
+    }
 
     void fetchGeneratedSession();
 
     return () => {
       mountedRef.current = false;
     };
-  }, [fetchGeneratedSession]);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const prefetch = async () => {
-      const targets = difficulties.filter((level) => !cachedSessions[level]?.length);
-
-      await Promise.all(
-        targets.map(async (level) => {
-          try {
-            const controller = new AbortController();
-            const timeout = setTimeout(() => controller.abort(), 4500);
-            const generated = await requestGeneratedQuestions(level, sessionSeed, controller.signal);
-            clearTimeout(timeout);
-
-            if (cancelled || generated.length === 0) {
-              return;
-            }
-
-            setCachedSessions((prev) => ({ ...prev, [level]: generated }));
-            saveQuestionHistory(topic, level, generated);
-          } catch {
-            // Non-blocking prefetch: ignore failures and keep bank fallback.
-          }
-        }),
-      );
-    };
-
-    void prefetch();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [cachedSessions, requestGeneratedQuestions, sessionSeed, topic]);
+  }, [fetchGeneratedSession, isSeedReady]);
 
   useEffect(() => {
     if (!finished) return;
     savedRef.current = true;
   }, [finished]);
 
-  const startNewSession = () => {
+  const startNewSession = (bumpSeed = true) => {
     savedRef.current = false;
 
-    const nextSeed = sessionSeed + 1;
-    setSessionSeed(nextSeed);
+    const nextSeed = bumpSeed ? sessionSeed + 1 : sessionSeed;
 
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem(storageSeedKey, String(nextSeed));
+    if (bumpSeed) {
+      setSessionSeed(nextSeed);
+
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(storageSeedKey, String(nextSeed));
+      }
     }
 
     setDifficulty("easy");
@@ -310,7 +322,6 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     setAiLoading(false);
     setGeneratedSession(null);
     setGenerationError(null);
-    setSessionSource("llm");
     setCurrentStreak(0);
   };
 
@@ -357,8 +368,15 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
   };
 
   const handleDifficulty = (nextDifficulty: Difficulty) => {
-    startNewSession();
+    startNewSession(false);
     setDifficulty(nextDifficulty);
+
+    const cachedSession = cachedSessions[nextDifficulty];
+    if (cachedSession?.length) {
+      setGeneratedSession(cachedSession);
+      setGenerationError(null);
+      setIsGeneratingSession(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -421,7 +439,6 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
         setAiExplanation("");
         setAiError("");
         setAiLoading(false);
-        setSessionSource("llm");
         return;
       }
 
@@ -453,7 +470,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     return (
       <main className="min-h-screen bg-[#FFFBF5] font-sans">
         <div className="mx-auto max-w-3xl px-6 py-12">
-          <h1 className="text-2xl font-black text-gray-800">LLM failed to generate questions.</h1>
+          <h1 className="text-2xl font-black text-gray-800">Unable to generate questions.</h1>
           <p className="mt-2 text-sm text-gray-500">{generationError}</p>
           <button
             type="button"
@@ -462,7 +479,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
             }}
             className="mt-4 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
           >
-            Retry LLM
+            {text.tryAgain}
           </button>
         </div>
       </main>
@@ -473,8 +490,8 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     return (
       <main className="min-h-screen bg-[#FFFBF5] font-sans">
         <div className="mx-auto max-w-3xl px-6 py-12">
-          <h1 className="text-2xl font-black text-gray-800">Generating LLM questions...</h1>
-          <p className="mt-2 text-sm text-gray-500">Please wait while NVIDIA Llama 3.1 creates a fresh session.</p>
+          <h1 className="text-2xl font-black text-gray-800">{text.generatingQuestions}</h1>
+          <p className="mt-2 text-sm text-gray-500">Please wait while a fresh session is prepared.</p>
           <button
             type="button"
             onClick={() => {
@@ -482,7 +499,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
             }}
             className="mt-4 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
           >
-            Retry LLM
+            {text.tryAgain}
           </button>
         </div>
       </main>
@@ -580,9 +597,6 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
       <nav className="relative flex flex-wrap items-center justify-between gap-2 border-b border-pink-100 bg-white/80 px-4 sm:px-6 py-3 sm:py-4 backdrop-blur-xl">
         <BrandLogo />
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full px-3 py-1 text-[10px] sm:text-xs font-black uppercase tracking-[0.14em] bg-emerald-100 text-emerald-700">
-            {getSessionSourceLabel(sessionSource, language)}
-          </span>
           <Link href={`/${topic}`} className="text-sm font-semibold text-[#E91E63] hover:text-pink-700">
             {text.learnConcept}
           </Link>
@@ -632,13 +646,9 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
               <span>{text.wrong}: {wrongCount}</span>
             </div>
 
-            <p className="mt-3 text-xs font-medium">
-          {isGeneratingSession ? (
-            <span className="text-sky-300">⏳ {text.generatingQuestions}</span>
-          ) : (
-            <span className="text-emerald-300">🤖 {text.aiRoundActive}</span>
-          )}
-            </p>
+            {isGeneratingSession ? (
+              <p className="mt-3 text-xs font-medium text-sky-300">⏳ {text.generatingQuestions}</p>
+            ) : null}
 
             {generationError ? (
               <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
@@ -650,7 +660,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
                   }}
                   className="mt-3 rounded-xl bg-[#E91E63] px-4 py-2 text-sm font-bold text-white"
                 >
-                  Retry LLM
+                  {text.tryAgain}
                 </button>
               </div>
             ) : null}

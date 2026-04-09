@@ -74,11 +74,66 @@ const LogoutIcon = () => (
     <line x1="21" y1="12" x2="9" y2="12" />
   </svg>
 );
+
+const sidebarText: Record<AppLanguage, {
+  home: string;
+  dashboard: string;
+  practice: string;
+  progress: string;
+  mockTest: string;
+  totalPoints: string;
+  navigation: string;
+  language: string;
+  currentTopic: string;
+  learningMode: string;
+  logout: string;
+}> = {
+  English: {
+    home: "Home",
+    dashboard: "Dashboard",
+    practice: "Practice",
+    progress: "Progress",
+    mockTest: "Mock Test",
+    totalPoints: "Total Points",
+    navigation: "Navigation",
+    language: "Language",
+    currentTopic: "Current Topic",
+    learningMode: "Learning Mode",
+    logout: "Logout",
+  },
+  Hindi: {
+    home: "होम",
+    dashboard: "डैशबोर्ड",
+    practice: "अभ्यास",
+    progress: "प्रगति",
+    mockTest: "मॉक टेस्ट",
+    totalPoints: "कुल अंक",
+    navigation: "नेविगेशन",
+    language: "भाषा",
+    currentTopic: "वर्तमान विषय",
+    learningMode: "सीखने का मोड",
+    logout: "लॉगआउट",
+  },
+  Marathi: {
+    home: "होम",
+    dashboard: "डॅशबोर्ड",
+    practice: "सराव",
+    progress: "प्रगती",
+    mockTest: "मॉक टेस्ट",
+    totalPoints: "एकूण गुण",
+    navigation: "नेव्हिगेशन",
+    language: "भाषा",
+    currentTopic: "सध्याचा विषय",
+    learningMode: "शिकण्याचा मोड",
+    logout: "लॉगआउट",
+  },
+};
 export default function DashboardSidebar({ session, totalPoints, appearance = "light", currentTopic }: Props) {
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const dark = appearance === "dark";
+  const text = sidebarText[language] ?? sidebarText.English;
 
   const profileName = useMemo(
     () => session.user?.name?.trim() || session.user?.email?.split("@")[0] || "Student",
@@ -103,11 +158,11 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
     !pathname.startsWith("/login");
 
   const navItems = [
-    { label: "Home", href: "/", icon: <HomeIcon />, active: pathname === "/" },
-    { label: "Dashboard", href: "/tool", icon: <DashboardIcon />, active: pathname === "/tool" },
-    { label: "Practice", href: "/number-patterns", icon: <BookIcon />, active: isPracticeArea },
-    { label: "Progress", href: "/progress-history", icon: <AnalyticsIcon />, active: pathname === "/progress-history" },
-    { label: "Mock Test", href: "/mock-test", icon: <TrophyIcon />, active: pathname === "/mock-test" },
+    { label: text.home, href: "/", icon: <HomeIcon />, active: pathname === "/" },
+    { label: text.dashboard, href: "/tool", icon: <DashboardIcon />, active: pathname === "/tool" },
+    { label: text.practice, href: "/number-patterns", icon: <BookIcon />, active: isPracticeArea },
+    { label: text.progress, href: "/progress-history", icon: <AnalyticsIcon />, active: pathname === "/progress-history" },
+    { label: text.mockTest, href: "/mock-test", icon: <TrophyIcon />, active: pathname === "/mock-test" },
   ];
 
   return (
@@ -185,7 +240,7 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
             </nav>
 
             <div className="mt-4 rounded-xl border border-gray-100 bg-white p-2">
-              <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">Language</p>
+              <p className="mb-1.5 px-1 text-[9px] font-bold uppercase tracking-[0.2em] text-slate-400">{text.language}</p>
               <div className="flex gap-1 rounded-lg border border-gray-100 bg-white p-1">
                 {LANG_OPTIONS.map((opt) => (
                   <button
@@ -224,7 +279,7 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
               </div>
               <button
                 onClick={() => signOut({ callbackUrl: "/" })}
-                title="Logout"
+                title={text.logout}
                 className="flex-shrink-0 rounded-lg p-1.5 text-slate-400 transition-all hover:bg-[#E91E63]/10 hover:text-[#E91E63]"
               >
                 <LogoutIcon />
@@ -251,14 +306,14 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
         <div className={`mt-4 flex items-center gap-2.5 rounded-xl border px-3 py-2.5 backdrop-blur-md ${dark ? "border-white/5 bg-white/5" : "border-white/60 bg-white/80 shadow-[0_8px_24px_rgba(15,23,42,0.04)]"}`}>
           <span className="text-base">🏆</span>
           <div>
-            <p className={`${dark ? "text-white/30" : "text-slate-400"} text-[9px] font-semibold uppercase tracking-wider`}>Total Points</p>
+            <p className={`${dark ? "text-white/30" : "text-slate-400"} text-[9px] font-semibold uppercase tracking-wider`}>{text.totalPoints}</p>
             <p className={`${dark ? "text-white" : "text-slate-900"} font-black text-sm leading-none mt-0.5`}>{totalPoints}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        <p className={`px-3 mb-2 text-[9px] font-bold uppercase tracking-[0.2em] ${dark ? "text-white/20" : "text-slate-400"}`}>Navigation</p>
+        <p className={`px-3 mb-2 text-[9px] font-bold uppercase tracking-[0.2em] ${dark ? "text-white/20" : "text-slate-400"}`}>{text.navigation}</p>
         {navItems.map((item) => (
           <Link
             key={item.href + item.label}
@@ -283,14 +338,14 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
 
         {currentTopic ? (
           <div className={`mt-5 rounded-2xl border p-3 backdrop-blur-md ${dark ? "border-[#E91E63]/25 bg-[#E91E63]/10 shadow-[0_0_24px_rgba(233,30,99,0.18)]" : "border-[#E91E63]/16 bg-white/78 shadow-[0_16px_34px_rgba(233,30,99,0.08)]"}`}>
-            <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#E91E63]">Current Topic</p>
+            <p className="mb-2 text-[9px] font-bold uppercase tracking-[0.2em] text-[#E91E63]">{text.currentTopic}</p>
             <div className={`flex items-center gap-3 rounded-xl border px-3 py-2.5 ${dark ? "border-white/10 bg-white/5" : "border-gray-100 bg-white/90"}`}>
               <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-[#E91E63] to-[#FF4081] text-lg shadow-[0_12px_24px_rgba(233,30,99,0.28)]">
                 {currentTopic.icon}
               </span>
               <div className="min-w-0">
                 <p className={`truncate text-sm font-bold ${dark ? "text-white" : "text-slate-900"}`}>{currentTopic.title}</p>
-                <p className={`text-[10px] ${dark ? "text-white/40" : "text-slate-400"}`}>Learning Mode</p>
+                <p className={`text-[10px] ${dark ? "text-white/40" : "text-slate-400"}`}>{text.learningMode}</p>
               </div>
             </div>
           </div>
@@ -300,7 +355,7 @@ export default function DashboardSidebar({ session, totalPoints, appearance = "l
       <div className={`border-t px-4 py-4 space-y-4 ${dark ? "border-white/10" : "border-gray-100"}`}>
 
         <div>
-          <p className={`mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] ${dark ? "text-white/20" : "text-slate-400"}`}>Language</p>
+          <p className={`mb-1.5 text-[9px] font-bold uppercase tracking-[0.2em] ${dark ? "text-white/20" : "text-slate-400"}`}>{text.language}</p>
           <div className={`flex gap-1 rounded-xl border p-1 backdrop-blur-md ${dark ? "border-white/5 bg-white/5" : "border-gray-100 bg-white/88"}`}>
             {LANG_OPTIONS.map((opt) => (
               <button

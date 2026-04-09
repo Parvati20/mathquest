@@ -25,24 +25,24 @@ export async function getMathExplanation(
       body: JSON.stringify({
         model: "meta/llama-3.1-8b-instruct",
         messages: [
-          { 
-            role: "system", 
+          {
+            role: "system",
             content: [
               `You are a helpful NavGurukul math mentor. Reply only in ${language}.`,
               "Keep the explanation concise, accurate, and student-friendly.",
               "Use baseExplanation as source of truth and keep final numeric answer exactly same.",
-            ].join(" ")
+            ].join(" "),
           },
-          { 
-            role: "user", 
+          {
+            role: "user",
             content: [
               `Topic: ${topic}`,
               `Question: ${question}`,
               `Correct Answer (must use exactly): ${correctAnswer}`,
               `Base Explanation (source of truth): ${baseExplanation}`,
               "Rewrite in 2-4 short lines and end with: Final Answer: <correct answer>",
-            ].join("\n")
-          }
+            ].join("\n"),
+          },
         ],
         temperature: 0,
         max_tokens: 120,
@@ -76,19 +76,132 @@ type GenerateQuestionParams = {
   blockedQuestionSignatures?: string[];
 };
 
-function extractJsonObject(raw: string) {
-  const start = raw.indexOf("{");
-  const end = raw.lastIndexOf("}");
+type GeneratedQuestionTranslation = {
+  question: string;
+  options: [string, string, string, string];
+  explanation: string;
+};
 
-  if (start === -1 || end === -1 || end <= start) {
-    return null;
+function extractJsonCandidates(raw: string) {
+  const candidates: string[] = [];
+  const fenceMatches = raw.match(/```(?:json)?\s*([\s\S]*?)```/gi);
+
+  if (fenceMatches) {
+    for (const match of fenceMatches) {
+      const contentMatch = match.match(/```(?:json)?\s*([\s\S]*?)```/i);
+      const content = contentMatch?.[1]?.trim();
+      if (content) {
+        candidates.push(content);
+      }
+    }
   }
 
-  return raw.slice(start, end + 1);
+  candidates.push(raw.trim());
+
+  return candidates.filter(Boolean);
+}
+
+function findBalancedJsonSegment(raw: string, openChar: "{" | "[", closeChar: "}" | "]") {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let startIndex = -1;
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const char = raw[index];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+      continue;
+    }
+
+    if (char === openChar) {
+      if (depth === 0) {
+        startIndex = index;
+      }
+      depth += 1;
+      continue;
+    }
+
+    if (char === closeChar && depth > 0) {
+      depth -= 1;
+      if (depth === 0 && startIndex !== -1) {
+        return raw.slice(startIndex, index + 1);
+      }
+    }
+  }
+
+  return null;
 }
 
 function normalizeQuestionSignature(question: string) {
   return question.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function normalizeOptionSignature(option: string) {
+  return option
+    .replace(/^[A-Da-d][\).:-]?\s*/, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripOptionPrefix(option: string) {
+  return option.replace(/^[A-Da-d][\).:-]?\s*/, "").trim();
+}
+
+function matchesSelectedLanguage(text: string, language: "English" | "Hindi" | "Marathi") {
+  const latinLetters = (text.match(/[A-Za-z]/g) ?? []).length;
+  const devanagariLetters = (text.match(/[\u0900-\u097F]/g) ?? []).length;
+
+  if (language === "English") {
+    return latinLetters >= devanagariLetters;
+  }
+
+  // Hindi/Marathi both use Devanagari; reject mixed English text.
+  return devanagariLetters > 0 && latinLetters === 0;
+}
+
+function normalizeQuestionTranslation(
+  rawTranslation: unknown,
+  fallbackQuestion: string,
+  fallbackExplanation: string,
+  fallbackOptions: [string, string, string, string],
+) {
+  if (!rawTranslation || typeof rawTranslation !== "object") {
+    return undefined;
+  }
+
+  const record = rawTranslation as Record<string, unknown>;
+  const question = typeof record.question === "string" ? record.question.trim() : "";
+  const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
+  const options = Array.isArray(record.options)
+    ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
+    : [];
+
+  if (!question && !explanation) {
+    return undefined;
+  }
+
+  return {
+    question: question || fallbackQuestion,
+    options:
+      options.length === 4
+        ? [options[0], options[1], options[2], options[3]] as [string, string, string, string]
+        : fallbackOptions,
+    explanation: explanation || fallbackExplanation,
+  };
 }
 
 function normalizeGeneratedQuestions(
@@ -97,6 +210,7 @@ function normalizeGeneratedQuestions(
   difficulty: Difficulty,
   count: number,
   blockedSignatures: Set<string>,
+  language: "English" | "Hindi" | "Marathi",
 ): TopicQuestion[] {
   if (!Array.isArray(questions)) {
     return [];
@@ -115,10 +229,35 @@ function normalizeGeneratedQuestions(
     const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
     const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
     const options = Array.isArray(record.options)
-      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
+      ? record.options
+          .filter((value): value is string => typeof value === "string")
+          .map((value: string) => stripOptionPrefix(value.trim()))
       : [];
+    const translationsRecord = record.translations && typeof record.translations === "object"
+      ? (record.translations as Record<string, unknown>)
+      : null;
+    const translations = translationsRecord
+      ? {
+          English: normalizeQuestionTranslation(translationsRecord.English, question, explanation, [options[0], options[1], options[2], options[3]]),
+          Hindi: normalizeQuestionTranslation(translationsRecord.Hindi, question, explanation, [options[0], options[1], options[2], options[3]]),
+          Marathi: normalizeQuestionTranslation(translationsRecord.Marathi, question, explanation, [options[0], options[1], options[2], options[3]]),
+        }
+      : undefined;
 
     if (!question || !explanation || options.length !== 4 || answerIndex < 0 || answerIndex > 3) {
+      continue;
+    }
+
+    if (!matchesSelectedLanguage(question, language)) {
+      continue;
+    }
+
+    if (!matchesSelectedLanguage(explanation, language)) {
+      continue;
+    }
+
+    const normalizedOptionSet = new Set(options.map((option) => normalizeOptionSignature(option)));
+    if (normalizedOptionSet.size !== 4 || Array.from(normalizedOptionSet).some((option) => option.length === 0)) {
       continue;
     }
 
@@ -136,6 +275,7 @@ function normalizeGeneratedQuestions(
       options: [options[0], options[1], options[2], options[3]],
       answerIndex,
       explanation,
+      translations,
     });
 
     if (normalized.length >= count) {
@@ -163,43 +303,259 @@ async function requestNvidiaBatch(prompt: {
   temperature: number;
   max_tokens: number;
   top_p: number;
+  timeoutMs?: number;
 }): Promise<string> {
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${prompt.apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
-      messages: [
-        { role: "system", content: prompt.systemPrompt },
-        { role: "user", content: prompt.userPrompt },
-      ],
-      temperature: prompt.temperature,
-      max_tokens: prompt.max_tokens,
-      top_p: prompt.top_p,
-    }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), prompt.timeoutMs ?? 45000);
 
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
+  try {
+    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${prompt.apiKey}`,
+        "Content-Type": "application/json",
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: "meta/llama-3.1-8b-instruct",
+        messages: [
+          { role: "system", content: prompt.systemPrompt },
+          { role: "user", content: prompt.userPrompt },
+        ],
+        temperature: prompt.temperature,
+        max_tokens: prompt.max_tokens,
+        top_p: prompt.top_p,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
+    }
+
+    const data = await response.json();
+    return String(data?.choices?.[0]?.message?.content ?? "");
+  } finally {
+    clearTimeout(timeoutId);
   }
-
-  const data = await response.json();
-  return String(data?.choices?.[0]?.message?.content ?? "");
 }
 
 function parseNvidiaQuestionBlock(raw: string) {
-  const jsonBlock = extractJsonObject(raw);
+  for (const candidate of extractJsonCandidates(raw)) {
+    const directCandidates = [
+      candidate,
+      findBalancedJsonSegment(candidate, "{", "}"),
+      findBalancedJsonSegment(candidate, "[", "]"),
+    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
 
-  if (!jsonBlock) {
-    return null;
+    for (const directCandidate of directCandidates) {
+      try {
+        const parsed = JSON.parse(directCandidate.trim()) as unknown;
+
+        if (Array.isArray(parsed)) {
+          return { questions: parsed };
+        }
+
+        if (parsed && typeof parsed === "object") {
+          const record = parsed as { questions?: unknown };
+          if (Array.isArray(record.questions)) {
+            return record;
+          }
+        }
+      } catch {
+        // Keep trying the next candidate.
+      }
+    }
   }
 
+  return null;
+}
+
+function parseNvidiaTranslationBlock(raw: string) {
+  for (const candidate of extractJsonCandidates(raw)) {
+    const directCandidates = [
+      candidate,
+      findBalancedJsonSegment(candidate, "{", "}"),
+      findBalancedJsonSegment(candidate, "[", "]"),
+    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+    for (const directCandidate of directCandidates) {
+      try {
+        const parsed = JSON.parse(directCandidate.trim()) as unknown;
+
+        if (Array.isArray(parsed)) {
+          return { translations: parsed };
+        }
+
+        if (parsed && typeof parsed === "object") {
+          const record = parsed as { translations?: unknown };
+          if (Array.isArray(record.translations)) {
+            return record;
+          }
+        }
+      } catch {
+        // Keep trying candidates.
+      }
+    }
+  }
+
+  return null;
+}
+
+async function translateQuestionChunk(
+  chunk: TopicQuestion[],
+  targetLanguage: "Hindi" | "Marathi",
+  apiKey: string,
+): Promise<Array<GeneratedQuestionTranslation | null>> {
+  const systemPrompt = [
+    `You are a strict translation engine. Translate math MCQ text to ${targetLanguage}.`,
+    "Keep all numbers, symbols, equations, and numeric values unchanged.",
+    "Translate only natural language text in question/options/explanation.",
+    "Return only valid JSON. No markdown.",
+    'Schema: {"translations":[{"question":"...","options":["...","...","...","..."],"explanation":"..."}]}',
+  ].join(" ");
+
+  const sourcePayload = chunk.map((question) => ({
+    question: question.question,
+    options: question.options,
+    explanation: question.explanation,
+  }));
+
+  const userPrompt = [
+    `Translate all items to ${targetLanguage}.`,
+    "Keep array length and order exactly the same.",
+    "Input JSON:",
+    JSON.stringify(sourcePayload),
+  ].join("\n");
+
+  const raw = await requestNvidiaBatch({
+    systemPrompt,
+    userPrompt,
+    apiKey,
+    temperature: 0,
+    max_tokens: 2400,
+    top_p: 1,
+    timeoutMs: 16000,
+  });
+
+  const parsed = parseNvidiaTranslationBlock(raw);
+  const translations = parsed?.translations;
+  if (!Array.isArray(translations)) {
+    return chunk.map(() => null);
+  }
+
+  return chunk.map((_, index) => {
+    const item = translations[index];
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+
+    const record = item as Record<string, unknown>;
+    const question = typeof record.question === "string" ? record.question.trim() : "";
+    const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
+    const options = Array.isArray(record.options)
+      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
+      : [];
+
+    if (!question || !explanation || options.length !== 4) {
+      return null;
+    }
+
+    return {
+      question,
+      options: [options[0], options[1], options[2], options[3]],
+      explanation,
+    };
+  });
+}
+
+async function attachAutoTranslations(questions: TopicQuestion[], apiKey: string) {
+  if (questions.length === 0) {
+    return questions;
+  }
+
+  const chunkSize = 8;
+  const translated = questions.map((question) => ({ ...question }));
+
+  for (let start = 0; start < translated.length; start += chunkSize) {
+    const chunk = translated.slice(start, start + chunkSize);
+
+    let hindiChunk: Array<GeneratedQuestionTranslation | null> = chunk.map(() => null);
+    let marathiChunk: Array<GeneratedQuestionTranslation | null> = chunk.map(() => null);
+
+    try {
+      hindiChunk = await translateQuestionChunk(chunk, "Hindi", apiKey);
+    } catch {
+      // Best effort; keep base text if translation fails.
+    }
+
+    try {
+      marathiChunk = await translateQuestionChunk(chunk, "Marathi", apiKey);
+    } catch {
+      // Best effort; keep base text if translation fails.
+    }
+
+    for (let index = 0; index < chunk.length; index += 1) {
+      const target = translated[start + index];
+      const baseOptions = target.options;
+      const baseExplanation = target.explanation;
+
+      target.translations = {
+        English: {
+          question: target.question,
+          options: baseOptions,
+          explanation: baseExplanation,
+        },
+        Hindi: hindiChunk[index]
+          ? {
+              question: hindiChunk[index]!.question,
+              options: hindiChunk[index]!.options,
+              explanation: hindiChunk[index]!.explanation,
+            }
+          : undefined,
+        Marathi: marathiChunk[index]
+          ? {
+              question: marathiChunk[index]!.question,
+              options: marathiChunk[index]!.options,
+              explanation: marathiChunk[index]!.explanation,
+            }
+          : undefined,
+      };
+    }
+  }
+
+  return translated;
+}
+
+async function repairNvidiaQuestionBlock(raw: string, apiKey: string, topic: string, difficulty: Difficulty, count: number) {
+  const repairSystemPrompt = [
+    "You are a strict JSON repair tool for math MCQs.",
+    "Convert the provided content into valid JSON only.",
+    "Preserve the question text, options, answerIndex, and explanation if they are present.",
+    "Do not add markdown, commentary, or code fences.",
+    'Return exactly this schema: {"questions":[{"question":"...","options":["...","...","...","..."],"answerIndex":0,"explanation":"...","translations":{"English":{"question":"...","options":["...","...","...","..."],"explanation":"..."},"Hindi":{"question":"...","options":["...","...","...","..."],"explanation":"..."},"Marathi":{"question":"...","options":["...","...","...","..."],"explanation":"..."}}]}',
+  ].join(" ");
+
+  const repairUserPrompt = [
+    `Topic: ${topic}`,
+    `Difficulty: ${difficulty}`,
+    `Target question count: ${count}`,
+    "Repair this output into valid JSON:",
+    raw.slice(0, 12000),
+  ].join("\n");
+
   try {
-    return JSON.parse(jsonBlock) as { questions?: unknown };
+    const repairedRaw = await requestNvidiaBatch({
+      systemPrompt: repairSystemPrompt,
+      userPrompt: repairUserPrompt,
+      apiKey,
+      temperature: 0,
+      max_tokens: 6000,
+      top_p: 1,
+      timeoutMs: 4000,
+    });
+
+    return parseNvidiaQuestionBlock(repairedRaw);
   } catch {
     return null;
   }
@@ -228,40 +584,97 @@ export async function generateMathQuestions({
   const requestId = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
 
   const safeCount = Math.min(Math.max(count, 1), 25);
-  const systemPrompt = `You are a Math AI. Generate ${safeCount} UNIQUE MCQ questions for "${topic}" at "${difficulty}" level.
-Language: ${language}.
+  const safeLanguage: "English" | "Hindi" | "Marathi" =
+    language === "Hindi" || language === "Marathi" ? language : "English";
+  const maxBatchSize = 4;
+  const maxAttempts = Math.max(10, Math.ceil(safeCount / maxBatchSize) + 10);
+  const totalBudgetMs = 120000;
+  const startedAtMs = Date.now();
+  const collected: TopicQuestion[] = [];
+  const dynamicBlockedSignatures = new Set(blockedSignatures);
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt < maxAttempts && collected.length < safeCount; attempt += 1) {
+    if (Date.now() - startedAtMs >= totalBudgetMs) {
+      break;
+    }
+
+    const remaining = safeCount - collected.length;
+    const batchCount = Math.min(maxBatchSize, remaining);
+    const batchRequestId = `${requestId}-${attempt + 1}`;
+
+    const systemPrompt = `You are a Math AI. Generate ${batchCount} UNIQUE MCQ questions for "${topic}" at "${difficulty}" level.
 RULES:
-1. DO NOT repeat these patterns: [${blockedQuestionSignatures.slice(-10).join(" | ")}].
-2. Use random numbers (e.g. ${Math.floor(Math.random() * 90 + 10)}).
-3. Request ID for variation: ${requestId}.
-4. Output ONLY valid JSON.
-Schema: {"questions": [{"question": "...", "options": ["A)...","B)...","C)...","D)..."], "answerIndex": 0, "explanation": "..."}]}`;
+1. Do not repeat these patterns: [${Array.from(dynamicBlockedSignatures).slice(-20).join(" | ")}].
+2. Use fresh wording and fresh numbers.
+3. Request ID for variation: ${batchRequestId}.
+4. Output only valid JSON.
+5. Write question, options, and explanation only in ${safeLanguage}.
+5a. If language is Hindi or Marathi, do not use any English words in question/explanation/options.
+5b. If the question involves money, use ₹ or Rs. and never use $.
+6. Options A, B, C, D must all be different values.
+7. Exactly one option must be correct, matching answerIndex.
+  Schema: {"questions": [{"question": "...", "options": ["A)...","B)...","C)...","D)..."], "answerIndex": 0, "explanation": "..."}]}`;
 
-  const userPrompt = `Generate ${safeCount} fresh MCQ questions now for topic ${topic} at ${difficulty} level. Return valid JSON only.`;
+    const userPrompt = `Generate exactly ${batchCount} fresh MCQ questions now for topic ${topic} at ${difficulty} level. Return valid JSON only. Use only ${safeLanguage}. If any question involves money, use ₹ or Rs. and never use $.`;
 
-  let raw = "";
+    let raw = "";
 
-  try {
-    raw = await requestNvidiaBatch({
-      systemPrompt,
-      userPrompt,
-      apiKey,
-      temperature: 0.95,
-      max_tokens: 1500,
-      top_p: 0.9,
-    });
-  } catch (error) {
-    console.error("AI Error:", error);
-    return [];
+    try {
+      raw = await requestNvidiaBatch({
+        systemPrompt,
+        userPrompt,
+        apiKey,
+        temperature: 0.95,
+        max_tokens: 1400,
+        top_p: 0.9,
+        timeoutMs: 12000,
+      });
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Question generation failed.");
+      continue;
+    }
+
+    const parsed = parseNvidiaQuestionBlock(raw);
+    const resolvedParsed = parsed ?? await repairNvidiaQuestionBlock(raw, apiKey, topic, difficulty, batchCount);
+    if (!resolvedParsed) {
+      lastError = new Error("NVIDIA response was not valid JSON.");
+      continue;
+    }
+
+    const batchQuestions = normalizeGeneratedQuestions(
+      resolvedParsed.questions,
+      topic,
+      difficulty,
+      batchCount,
+      dynamicBlockedSignatures,
+      safeLanguage,
+    );
+
+    if (batchQuestions.length === 0) {
+      lastError = new Error("NVIDIA response did not contain any valid questions.");
+      continue;
+    }
+
+    for (const question of batchQuestions) {
+      const signature = normalizeQuestionSignature(question.question);
+      dynamicBlockedSignatures.add(signature);
+      collected.push(question);
+      if (collected.length >= safeCount) {
+        break;
+      }
+    }
   }
 
-  const parsed = parseNvidiaQuestionBlock(raw);
-  if (!parsed) {
-    return [];
+  if (collected.length === 0) {
+    throw lastError ?? new Error("Question generation failed.");
   }
 
-  const questions = normalizeGeneratedQuestions(parsed.questions, topic, difficulty, safeCount, blockedSignatures);
-  return questions;
+  if (collected.length < safeCount) {
+    console.warn(`Returning partial question set: ${collected.length}/${safeCount}`);
+  }
+
+  return attachAutoTranslations(collected, apiKey);
 }
 
 type GenerateMockQuestionsParams = {
@@ -413,14 +826,13 @@ export async function generateMixedMockQuestions({
 
   const data = await response.json();
   const raw = String(data?.choices?.[0]?.message?.content ?? "");
-  const jsonBlock = extractJsonObject(raw);
+  const parsed = parseNvidiaQuestionBlock(raw);
 
-  if (!jsonBlock) {
+  if (!parsed) {
     return [];
   }
 
   try {
-    const parsed = JSON.parse(jsonBlock) as { questions?: unknown };
     return normalizeMockGeneratedQuestions(parsed.questions, safeCount, blockedSignatures);
   } catch {
     return [];

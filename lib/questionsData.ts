@@ -7,6 +7,16 @@ export interface TopicQuestion {
   options: [string, string, string, string];
   answerIndex: number;
   explanation: string;
+  translations?: Partial<
+    Record<
+      string,
+      {
+        question: string;
+        options?: [string, string, string, string];
+        explanation: string;
+      }
+    >
+  >;
 }
 
 function uniqueWrongAnswers(correct: number, deltas: number[]) {
@@ -56,7 +66,7 @@ function buildNumericMcq(correct: number, deltas: number[], indexSeed: number) {
 function generateNumberPatterns(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const start = 2 + i;
     const diff = 1 + (i % 5);
     const term4 = start + 3 * diff;
@@ -73,7 +83,7 @@ function generateNumberPatterns(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const start = 2 + (i % 4);
     const ratio = 2 + (i % 3);
     const term4 = start * ratio * ratio * ratio;
@@ -90,7 +100,7 @@ function generateNumberPatterns(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const n = i + 3;
     const answer = (n + 1) * (n + 1) + i;
     const sequence = [
@@ -118,7 +128,7 @@ function generateNumberPatterns(): TopicQuestion[] {
 function generatePercentage(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const percent = 5 * ((i % 6) + 1);
     const base = 40 + i * 10;
     const answer = (percent * base) / 100;
@@ -134,7 +144,7 @@ function generatePercentage(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const part = 20 + i * 3;
     const whole = part * (2 + (i % 3));
     const answer = Math.round((part / whole) * 100);
@@ -150,7 +160,7 @@ function generatePercentage(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const original = 120 + i * 15;
     const increase = 10 + (i % 5) * 5;
     const finalValue = Math.round(original * (1 + increase / 100));
@@ -173,7 +183,7 @@ function generatePercentage(): TopicQuestion[] {
 function generateWorkTime(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const days = 4 + i;
     const answer = days;
     const { options, answerIndex } = buildNumericMcq(answer, [-1, 1, -2, 2], i);
@@ -188,7 +198,7 @@ function generateWorkTime(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const a = 6 + i;
     const b = 8 + i;
     const answer = Number(((a * b) / (a + b)).toFixed(1));
@@ -218,7 +228,7 @@ function generateWorkTime(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const together = 4 + (i % 6);
     const a = together + 4 + (i % 4);
     const answer = Math.round((a * together) / (a - together));
@@ -240,7 +250,7 @@ function generateWorkTime(): TopicQuestion[] {
 function generateLinearEquations(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const x = 2 + (i % 7);
     const y = 1 + (i % 5);
     const sum = x + y;
@@ -257,7 +267,7 @@ function generateLinearEquations(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const x = 2 + (i % 6);
     const y = 3 + (i % 5);
     const c1 = 2 * x + y;
@@ -275,7 +285,7 @@ function generateLinearEquations(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const x = 2 + (i % 6);
     const y = 1 + (i % 6);
     const a1 = 2 + (i % 3);
@@ -303,7 +313,7 @@ function generateLinearEquations(): TopicQuestion[] {
 function generateSimpleInterest(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const p = 500 + i * 100;
     const r = 5 + (i % 6);
     const t = 1 + (i % 4);
@@ -320,7 +330,7 @@ function generateSimpleInterest(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const si = 120 + i * 20;
     const r = 4 + (i % 6);
     const t = 2 + (i % 4);
@@ -337,7 +347,7 @@ function generateSimpleInterest(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const p = 1000 + i * 150;
     const t = 2 + (i % 5);
     const answer = Number((100 / t).toFixed(1));
@@ -373,7 +383,7 @@ function generateSimpleInterest(): TopicQuestion[] {
 function generateProfitLoss(): TopicQuestion[] {
   const questions: TopicQuestion[] = [];
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const cp = 100 + i * 20;
     const profit = 10 + (i % 6) * 5;
     const sp = cp + profit;
@@ -390,7 +400,7 @@ function generateProfitLoss(): TopicQuestion[] {
     });
   }
 
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const cp = 200 + i * 30;
     const pPercent = 5 + (i % 6) * 5;
     const answer = Math.round((cp * pPercent) / 100);
@@ -405,7 +415,7 @@ function generateProfitLoss(): TopicQuestion[] {
       explanation: `Profit = ${pPercent}% of ${cp} = ${answer}.`,
     });
   }
-  for (let i = 1; i <= 14; i += 1) {
+  for (let i = 1; i <= 20; i += 1) {
     const cp = 300 + i * 25;
     const lossPercent = 5 + (i % 5) * 5;
     const sp = Math.round(cp * (1 - lossPercent / 100));

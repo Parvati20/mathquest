@@ -10,7 +10,7 @@ import {
   getLocalizedTopicContent,
   getUiText,
 } from "@/lib/language";
-import { buildMockFallbackSession, makeQuestionSignature, type MockQuestion } from "@/lib/mockSession";
+import { makeQuestionSignature, type MockQuestion } from "@/lib/mockSession";
 import { topicsData } from "@/lib/topicsData";
 
 const MOCK_QUESTION_COUNT = 20;
@@ -132,6 +132,7 @@ export default function MockTestClient() {
   const [sessionQuestions, setSessionQuestions] = useState<MockQuestion[]>([]);
   const [isGeneratingSession, setIsGeneratingSession] = useState(true);
   const [sessionSource, setSessionSource] = useState<"llm" | "mixed" | "bank">("bank");
+  const [generationError, setGenerationError] = useState<string | null>(null);
   const savedRef = useRef(false);
   const text = getUiText(language);
 
@@ -145,6 +146,7 @@ export default function MockTestClient() {
 
     const loadSession = async () => {
       setIsGeneratingSession(true);
+      setGenerationError(null);
 
       try {
         const controller = new AbortController();
@@ -166,31 +168,31 @@ export default function MockTestClient() {
         }
 
         if (!response.ok) {
-          throw new Error("Mock test generation failed.");
+          const failedBody = await response.json().catch(() => null);
+          const apiError = typeof failedBody?.error === "string" ? failedBody.error : "Mock test generation failed.";
+          throw new Error(apiError);
         }
 
         const data = await response.json();
         const questions = Array.isArray(data?.questions) ? (data.questions as MockQuestion[]) : [];
-        const apiSource = data?.source === "llm" || data?.source === "mixed" || data?.source === "bank"
-          ? data.source
-          : "bank";
+        const apiSource = data?.source === "llm" ? "llm" : "llm";
 
         if (questions.length > 0) {
           setSessionQuestions(questions.slice(0, MOCK_QUESTION_COUNT));
           setSessionSource(apiSource);
           saveMockQuestionHistory(questions);
         } else {
-          const fallback = buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT, readMockQuestionHistory());
-          setSessionQuestions(fallback);
-          setSessionSource("bank");
-          saveMockQuestionHistory(fallback);
+          throw new Error("LLM did not return questions.");
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
-          const fallback = buildMockFallbackSession(sessionSeed, MOCK_QUESTION_COUNT, readMockQuestionHistory());
-          setSessionQuestions(fallback);
-          setSessionSource("bank");
-          saveMockQuestionHistory(fallback);
+          setSessionQuestions([]);
+          setSessionSource("llm");
+          setGenerationError(
+            error instanceof Error && error.message
+              ? error.message
+              : "Unable to generate unique LLM mock questions right now.",
+          );
         }
       } finally {
         if (!cancelled) {
@@ -377,6 +379,36 @@ export default function MockTestClient() {
             <p className="mt-4 text-xs font-black uppercase tracking-[0.18em] text-[#E91E63]">
               Fresh session by {sessionSource === "llm" ? "LLM" : sessionSource === "mixed" ? "LLM + bank fallback" : "bank fallback"}
             </p>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (!isGeneratingSession && sessionQuestions.length === 0) {
+    return (
+      <main className="relative min-h-screen overflow-hidden bg-[#F8FAFC] font-sans text-gray-900">
+        <section className="mx-auto flex min-h-screen max-w-3xl items-center justify-center px-4 sm:px-6 py-10 text-center">
+          <div className="rounded-[2rem] border border-white/70 bg-white/90 p-8 sm:p-10 shadow-[0_24px_60px_rgba(15,23,42,0.08)] backdrop-blur-xl">
+            <p className="text-5xl">⚠️</p>
+            <h1 className="mt-4 text-2xl sm:text-3xl font-black tracking-tight text-gray-900">
+              Unable to generate mock right now
+            </h1>
+            <p className="mx-auto mt-3 max-w-lg text-sm text-gray-600">
+              {generationError ?? "Unique LLM questions are not available at this moment. Please retry."}
+            </p>
+            <button
+              type="button"
+              onClick={() => setSessionSeed(Date.now())}
+              className="mt-6 inline-flex items-center rounded-full bg-gradient-to-r from-[#E91E63] via-[#FF4081] to-[#FF8A65] px-6 py-3 text-xs font-black uppercase tracking-[0.14em] text-white shadow-lg transition hover:-translate-y-0.5"
+            >
+              Retry LLM Mock
+            </button>
+            <div className="mt-4">
+              <Link href="/tool" className="text-xs font-bold text-slate-600 underline underline-offset-4">
+                Back to Dashboard
+              </Link>
+            </div>
           </div>
         </section>
       </main>

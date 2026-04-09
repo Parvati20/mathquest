@@ -1,10 +1,6 @@
 import { NextResponse } from "next/server";
 import { generateMixedMockQuestions } from "@/lib/nvidia";
-import {
-  buildMockFallbackSession,
-  mergeMockQuestions,
-  normalizeSeed,
-} from "@/lib/mockSession";
+import { normalizeSeed } from "@/lib/mockSession";
 
 async function readJsonBody(request: Request) {
   const contentType = request.headers.get("content-type") ?? "";
@@ -43,25 +39,47 @@ export async function POST(request: Request) {
     );
     const count = 20;
 
-    try {
+    const collected = [] as Awaited<ReturnType<typeof generateMixedMockQuestions>>;
+    const seen = new Set<string>(
+      blockedQuestionSignatures.map((value: string) => value.toLowerCase().replace(/\s+/g, " ").trim()),
+    );
+
+    for (let attempt = 0; attempt < 3 && collected.length < count; attempt += 1) {
+      const pending = count - collected.length;
       const generated = await generateMixedMockQuestions({
-        count,
+        count: pending,
         language,
-        variationSeed,
-        blockedQuestionSignatures,
+        variationSeed: `${variationSeed ?? Date.now()}-${attempt + 1}`,
+        blockedQuestionSignatures: Array.from(seen),
       });
 
-      const merged = mergeMockQuestions(generated, variationSeed, count, blockedQuestionSignatures);
-      const source = generated.length === 0 ? "bank" : merged.length > generated.length ? "mixed" : "llm";
+      for (const question of generated) {
+        const signature = question.question.toLowerCase().replace(/\s+/g, " ").trim();
+        if (seen.has(signature)) {
+          continue;
+        }
 
-      return NextResponse.json({ questions: merged, source });
-    } catch (error) {
-      console.error("Mock test generation error:", error);
-      return NextResponse.json({
-        questions: buildMockFallbackSession(variationSeed, count, blockedQuestionSignatures),
-        source: "bank",
-      });
+        seen.add(signature);
+        collected.push(question);
+
+        if (collected.length >= count) {
+          break;
+        }
+      }
     }
+
+    if (collected.length < count) {
+      return NextResponse.json(
+        {
+          error: "Unable to generate enough unique LLM mock questions right now.",
+          generatedCount: collected.length,
+          requiredCount: count,
+        },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json({ questions: collected, source: "llm" });
   } catch (error) {
     console.error("Mock test route error:", error);
     return NextResponse.json({ error: "Unable to generate mock test right now." }, { status: 500 });

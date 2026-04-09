@@ -28,7 +28,7 @@ export async function POST(request: Request) {
 
     const topic = typeof body.topic === "string" ? body.topic.trim() : "";
     const difficulty = typeof body.difficulty === "string" ? body.difficulty.trim() : "";
-    const count = typeof body.count === "number" ? body.count : 25;
+    const count = typeof body.count === "number" ? body.count : 20;
     const language = typeof body.language === "string" && body.language.trim() ? body.language.trim() : "English";
     const variationSeed = typeof body.variationSeed === "number" || typeof body.variationSeed === "string"
       ? body.variationSeed
@@ -45,9 +45,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Valid topic and difficulty are required." }, { status: 400 });
     }
 
+    const difficultyValue = difficulty as Difficulty;
     const questions = await generateMathQuestions({
       topic,
-      difficulty: difficulty as Difficulty,
+      difficulty: difficultyValue,
       count,
       language,
       variationSeed,

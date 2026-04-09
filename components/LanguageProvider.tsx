@@ -16,13 +16,15 @@ export default function LanguageProvider({ children }: { children: React.ReactNo
   useEffect(() => {
     const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
     if (stored === "English" || stored === "Hindi" || stored === "Marathi") {
-      setLanguageState(stored as AppLanguage);
+      setLanguageState(stored);
     }
   }, []);
 
   const setLanguage = (nextLanguage: AppLanguage) => {
     setLanguageState(nextLanguage);
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage);
+    }
   };
 
   const value = useMemo(() => ({ language, setLanguage }), [language]);
