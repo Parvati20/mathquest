@@ -14,11 +14,15 @@ async function main() {
   await tryKill(3000);
   await tryKill(3001);
 
-  try {
-    rmSync('.next', { recursive: true, force: true });
-    console.log('Cleared .next');
-  } catch {
-    // Keep startup resilient even if cleanup is partially blocked.
+  // Clearing .next on every dev boot can race with file watchers on Windows.
+  // Opt-in cleanup only when explicitly requested.
+  if (process.env.FORCE_CLEAR_NEXT === '1') {
+    try {
+      rmSync('.next', { recursive: true, force: true });
+      console.log('Cleared .next');
+    } catch {
+      // Keep startup resilient even if cleanup is partially blocked.
+    }
   }
 }
 

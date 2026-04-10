@@ -161,6 +161,94 @@ function stripOptionPrefix(option: string) {
   return option.replace(/^[A-Da-d][\).:-]?\s*/, "").trim();
 }
 
+function parseOptionNumber(value: string) {
+  const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) {
+    return null;
+  }
+
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatNumericOption(value: number) {
+  if (Number.isInteger(value)) {
+    return String(value);
+  }
+
+  return Number(value.toFixed(2)).toString();
+}
+
+function detectNextPatternAnswer(question: string) {
+  const lower = question.toLowerCase();
+  const isPatternPrompt =
+    lower.includes("next number") ||
+    lower.includes("next term") ||
+    lower.includes("pattern") ||
+    lower.includes("sequence") ||
+    lower.includes("अगली") ||
+    lower.includes("पुढ") ||
+    lower.includes("क्रम");
+
+  if (!isPatternPrompt) {
+    return null;
+  }
+
+  const values = (question.match(/-?\d+(?:\.\d+)?/g) ?? []).map((value) => Number(value));
+  const numbers = values.filter((value) => Number.isFinite(value));
+
+  if (numbers.length < 3) {
+    return null;
+  }
+
+  const diffs = numbers.slice(1).map((value, index) => value - numbers[index]);
+  const firstDiff = diffs[0];
+  if (diffs.every((diff) => Math.abs(diff - firstDiff) < 1e-9)) {
+    return numbers[numbers.length - 1] + firstDiff;
+  }
+
+  if (numbers.every((value) => Math.abs(value) > 1e-9)) {
+    const ratios = numbers.slice(1).map((value, index) => value / numbers[index]);
+    const firstRatio = ratios[0];
+    if (Number.isFinite(firstRatio) && ratios.every((ratio) => Math.abs(ratio - firstRatio) < 1e-9)) {
+      return numbers[numbers.length - 1] * firstRatio;
+    }
+  }
+
+  if (diffs.length >= 2) {
+    const secondDiffs = diffs.slice(1).map((value, index) => value - diffs[index]);
+    const firstSecondDiff = secondDiffs[0];
+    if (secondDiffs.every((diff) => Math.abs(diff - firstSecondDiff) < 1e-9)) {
+      const nextDiff = diffs[diffs.length - 1] + firstSecondDiff;
+      return numbers[numbers.length - 1] + nextDiff;
+    }
+  }
+
+  return null;
+}
+
+function enforcePatternAnswerConsistency(options: [string, string, string, string], answerIndex: number, question: string) {
+  const computedAnswer = detectNextPatternAnswer(question);
+  if (computedAnswer === null) {
+    return { options, answerIndex };
+  }
+
+  const parsedOptions = options.map((option) => parseOptionNumber(option));
+  let correctedIndex = parsedOptions.findIndex(
+    (value) => value !== null && Math.abs((value as number) - computedAnswer) < 1e-9,
+  );
+
+  const updatedOptions = [...options] as [string, string, string, string];
+
+  if (correctedIndex === -1) {
+    const replacementIndex = 3;
+    updatedOptions[replacementIndex] = formatNumericOption(computedAnswer);
+    correctedIndex = replacementIndex;
+  }
+
+  return { options: updatedOptions, answerIndex: correctedIndex };
+}
+
 function matchesSelectedLanguage(text: string, language: "English" | "Hindi" | "Marathi") {
   const latinLetters = (text.match(/[A-Za-z]/g) ?? []).length;
   const devanagariLetters = (text.match(/[\u0900-\u097F]/g) ?? []).length;
@@ -227,20 +315,30 @@ function normalizeGeneratedQuestions(
     const record = item as Record<string, unknown>;
     const question = typeof record.question === "string" ? record.question.trim() : "";
     const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
-    const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
+    let answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
     const options = Array.isArray(record.options)
       ? record.options
           .filter((value): value is string => typeof value === "string")
           .map((value: string) => stripOptionPrefix(value.trim()))
       : [];
+
+    const consistency =
+      options.length === 4
+        ? enforcePatternAnswerConsistency([options[0], options[1], options[2], options[3]], answerIndex, question)
+        : null;
+
+    const safeOptions = consistency ? consistency.options : ([options[0], options[1], options[2], options[3]] as [string, string, string, string]);
+    if (consistency) {
+      answerIndex = consistency.answerIndex;
+    }
     const translationsRecord = record.translations && typeof record.translations === "object"
       ? (record.translations as Record<string, unknown>)
       : null;
     const translations = translationsRecord
       ? {
-          English: normalizeQuestionTranslation(translationsRecord.English, question, explanation, [options[0], options[1], options[2], options[3]]),
-          Hindi: normalizeQuestionTranslation(translationsRecord.Hindi, question, explanation, [options[0], options[1], options[2], options[3]]),
-          Marathi: normalizeQuestionTranslation(translationsRecord.Marathi, question, explanation, [options[0], options[1], options[2], options[3]]),
+          English: normalizeQuestionTranslation(translationsRecord.English, question, explanation, safeOptions),
+          Hindi: normalizeQuestionTranslation(translationsRecord.Hindi, question, explanation, safeOptions),
+          Marathi: normalizeQuestionTranslation(translationsRecord.Marathi, question, explanation, safeOptions),
         }
       : undefined;
 
@@ -256,7 +354,7 @@ function normalizeGeneratedQuestions(
       continue;
     }
 
-    const normalizedOptionSet = new Set(options.map((option) => normalizeOptionSignature(option)));
+    const normalizedOptionSet = new Set(safeOptions.map((option) => normalizeOptionSignature(option)));
     if (normalizedOptionSet.size !== 4 || Array.from(normalizedOptionSet).some((option) => option.length === 0)) {
       continue;
     }
@@ -272,7 +370,7 @@ function normalizeGeneratedQuestions(
       id: `llm-${topic}-${difficulty}-${Date.now()}-${index}`,
       difficulty,
       question,
-      options: [options[0], options[1], options[2], options[3]],
+      options: safeOptions,
       answerIndex,
       explanation,
       translations,
@@ -400,6 +498,126 @@ function parseNvidiaTranslationBlock(raw: string) {
   }
 
   return null;
+}
+
+function parseNvidiaVerificationBlock(raw: string) {
+  for (const candidate of extractJsonCandidates(raw)) {
+    const directCandidates = [
+      candidate,
+      findBalancedJsonSegment(candidate, "{", "}"),
+      findBalancedJsonSegment(candidate, "[", "]"),
+    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
+
+    for (const directCandidate of directCandidates) {
+      try {
+        const parsed = JSON.parse(directCandidate.trim()) as unknown;
+
+        if (Array.isArray(parsed)) {
+          return { checks: parsed };
+        }
+
+        if (parsed && typeof parsed === "object") {
+          const record = parsed as { checks?: unknown; results?: unknown };
+          if (Array.isArray(record.checks)) {
+            return { checks: record.checks };
+          }
+          if (Array.isArray(record.results)) {
+            return { checks: record.results };
+          }
+        }
+      } catch {
+        // Keep trying candidates.
+      }
+    }
+  }
+
+  return null;
+}
+
+async function verifyQuestionChunkAccuracy(
+  chunk: TopicQuestion[],
+  apiKey: string,
+  language: "English" | "Hindi" | "Marathi",
+): Promise<TopicQuestion[]> {
+  if (chunk.length === 0) {
+    return chunk;
+  }
+
+  const systemPrompt = [
+    "You are a strict math MCQ validator.",
+    "Solve each question and correct answerIndex if needed.",
+    "If no option matches the true answer, replace exactly one option with the correct value and set answerIndex accordingly.",
+    "Keep question text unchanged.",
+    `Keep explanation in ${language}.`,
+    "Return valid JSON only. No markdown.",
+    'Schema: {"checks":[{"options":["...","...","...","..."],"answerIndex":0,"explanation":"..."}]}',
+  ].join(" ");
+
+  const payload = chunk.map((question) => ({
+    question: question.question,
+    options: question.options,
+    answerIndex: question.answerIndex,
+    explanation: question.explanation,
+  }));
+
+  const userPrompt = [
+    "Validate and correct each item.",
+    "Keep array length and order exactly the same.",
+    "Input JSON:",
+    JSON.stringify(payload),
+  ].join("\n");
+
+  const raw = await requestNvidiaBatch({
+    systemPrompt,
+    userPrompt,
+    apiKey,
+    temperature: 0,
+    max_tokens: 2600,
+    top_p: 1,
+    timeoutMs: 12000,
+  });
+
+  const parsed = parseNvidiaVerificationBlock(raw);
+  const checks = parsed?.checks;
+
+  if (!Array.isArray(checks)) {
+    return chunk;
+  }
+
+  return chunk.map((original, index) => {
+    const item = checks[index];
+    if (!item || typeof item !== "object") {
+      return original;
+    }
+
+    const record = item as Record<string, unknown>;
+    const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : original.answerIndex;
+    const optionsRaw = Array.isArray(record.options)
+      ? record.options
+          .filter((value): value is string => typeof value === "string")
+          .map((value: string) => stripOptionPrefix(value.trim()))
+      : original.options;
+    const explanation =
+      typeof record.explanation === "string" && record.explanation.trim().length > 0
+        ? record.explanation.trim()
+        : original.explanation;
+
+    if (optionsRaw.length !== 4 || answerIndex < 0 || answerIndex > 3) {
+      return original;
+    }
+
+    const optionSet = new Set(optionsRaw.map((option) => normalizeOptionSignature(option)));
+    if (optionSet.size !== 4) {
+      return original;
+    }
+
+    return {
+      ...original,
+      options: [optionsRaw[0], optionsRaw[1], optionsRaw[2], optionsRaw[3]],
+      answerIndex,
+      explanation,
+    };
+  });
 }
 
 async function translateQuestionChunk(
@@ -656,7 +874,14 @@ RULES:
       continue;
     }
 
-    for (const question of batchQuestions) {
+    let verifiedBatchQuestions = batchQuestions;
+    try {
+      verifiedBatchQuestions = await verifyQuestionChunkAccuracy(batchQuestions, apiKey, safeLanguage);
+    } catch {
+      // If verification fails, keep original generated batch.
+    }
+
+    for (const question of verifiedBatchQuestions) {
       const signature = normalizeQuestionSignature(question.question);
       dynamicBlockedSignatures.add(signature);
       collected.push(question);
