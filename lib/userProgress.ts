@@ -106,9 +106,31 @@ export async function getUserProgress(userId: string): Promise<UserProgress | nu
     }
 
     const db = client.db();
-    const doc = await db
-      .collection<UserProgress>("userProgress")
-      .findOne({ userId }, { projection: { _id: 0 } });
+    const collection = db.collection<UserProgress>("userProgress");
+    const emptyProgress = createEmptyUserProgress(userId);
+
+    // Auto-create a user document on first authenticated read (login/open dashboard).
+    await collection.updateOne(
+      { userId },
+      {
+        $setOnInsert: {
+          userId: emptyProgress.userId,
+          topicProgress: emptyProgress.topicProgress,
+          totalSolved: emptyProgress.totalSolved,
+          totalAttempts: emptyProgress.totalAttempts,
+          totalWrong: emptyProgress.totalWrong,
+          totalPoints: emptyProgress.totalPoints,
+          mockAttempts: emptyProgress.mockAttempts,
+          mockBestScore: emptyProgress.mockBestScore,
+          practiceSessions: emptyProgress.practiceSessions,
+          mockHistory: emptyProgress.mockHistory,
+          updatedAt: new Date(),
+        },
+      },
+      { upsert: true },
+    );
+
+    const doc = await collection.findOne({ userId }, { projection: { _id: 0 } });
     return doc;
   } catch (error) {
     console.error("getUserProgress failed:", error);

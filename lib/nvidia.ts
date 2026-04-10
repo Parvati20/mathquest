@@ -584,7 +584,7 @@ async function verifyQuestionChunkAccuracy(
     return chunk;
   }
 
-  return chunk.map((original, index) => {
+  const corrected: TopicQuestion[] = chunk.map((original, index) => {
     const item = checks[index];
     if (!item || typeof item !== "object") {
       return original;
@@ -613,11 +613,90 @@ async function verifyQuestionChunkAccuracy(
 
     return {
       ...original,
-      options: [optionsRaw[0], optionsRaw[1], optionsRaw[2], optionsRaw[3]],
+      options: [optionsRaw[0], optionsRaw[1], optionsRaw[2], optionsRaw[3]] as [string, string, string, string],
       answerIndex,
       explanation,
     };
   });
+
+  const auditSystemPrompt = [
+    "You are an independent MCQ math auditor.",
+    "Do not trust the provided answerIndex; solve each question independently.",
+    "If the provided answerIndex is correct, mark isValid=true.",
+    "If it is wrong but a correct option exists, set isValid=true and provide corrected answerIndex.",
+    "If no option is mathematically correct, mark isValid=false.",
+    "Return valid JSON only. No markdown.",
+    'Schema: {"checks":[{"isValid":true,"answerIndex":0}]}',
+  ].join(" ");
+
+  const auditPrompt = [
+    "Audit these questions.",
+    "Keep array order and length same.",
+    "Input JSON:",
+    JSON.stringify(
+      corrected.map((question) => ({
+        question: question.question,
+        options: question.options,
+        answerIndex: question.answerIndex,
+        explanation: question.explanation,
+      })),
+    ),
+  ].join("\n");
+
+  try {
+    const auditRaw = await requestNvidiaBatch({
+      systemPrompt: auditSystemPrompt,
+      userPrompt: auditPrompt,
+      apiKey,
+      temperature: 0,
+      max_tokens: 1800,
+      top_p: 1,
+      timeoutMs: 9000,
+    });
+
+    const auditParsed = parseNvidiaVerificationBlock(auditRaw);
+    const auditChecks = auditParsed?.checks;
+
+    if (!Array.isArray(auditChecks)) {
+      return corrected;
+    }
+
+    const validated: TopicQuestion[] = [];
+
+    for (let index = 0; index < corrected.length; index += 1) {
+      const current = corrected[index];
+      const auditItem = auditChecks[index];
+
+      if (!auditItem || typeof auditItem !== "object") {
+        continue;
+      }
+
+      const auditRecord = auditItem as Record<string, unknown>;
+      const isValid =
+        auditRecord.isValid === true ||
+        auditRecord.valid === true ||
+        auditRecord.status === "valid";
+      const correctedAnswerIndex =
+        typeof auditRecord.answerIndex === "number" &&
+        auditRecord.answerIndex >= 0 &&
+        auditRecord.answerIndex <= 3
+          ? auditRecord.answerIndex
+          : current.answerIndex;
+
+      if (!isValid) {
+        continue;
+      }
+
+      validated.push({
+        ...current,
+        answerIndex: correctedAnswerIndex,
+      });
+    }
+
+    return validated;
+  } catch {
+    return corrected;
+  }
 }
 
 async function translateQuestionChunk(
