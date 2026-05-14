@@ -1,5 +1,625 @@
-import { getMockTopicTitle, type MockQuestion } from "@/lib/mockSession";
-import type { Difficulty, TopicQuestion } from "@/lib/questionsData";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
+const MODEL = "llama-3.1-8b-instant";
+const QUESTION_GENERATION_BUDGET_MS = 20000;
+
+import fs from "fs";
+import path from "path";
+
+export type GeneratedQuestion = {
+  id: string;
+  question: string;
+  options: [string, string, string, string];
+  answerIndex: number;
+  explanation: string;
+  difficulty: string;
+  translations?: Record<
+    string,
+    {
+      question: string;
+      options: [string, string, string, string];
+      explanation: string;
+    }
+  >;
+};
+
+function ensureNvidiaLogDir() {
+  try {
+    const dir = path.join(process.cwd(), ".nvidia-logs");
+    fs.mkdirSync(dir, { recursive: true });
+    return dir;
+  } catch (e) {
+    console.log("[nvidia logs] ensure dir failed:", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
+function dumpNvidiaDebug(filenamePrefix: string, content: string) {
+  try {
+    const dir = ensureNvidiaLogDir();
+    if (!dir) return null;
+    const name = `${Date.now()}-${filenamePrefix.replace(/[^a-z0-9-_\.]/gi, "_")}.log`;
+    const file = path.join(dir, name);
+    fs.appendFileSync(file, content, { encoding: "utf8" });
+    console.log(`[nvidia logs] Wrote debug dump: ${file}`);
+    return file;
+  } catch {
+    console.log("[nvidia logs] write failed");
+    return null;
+  }
+}
+
+function normalizeWhitespace(text: string) {
+  return text.replace(/\s+/g, " ").trim();
+}
+
+function stripEmbeddedOptions(text: string) {
+  const normalized = normalizeWhitespace(text);
+  const optionMarker = normalized.match(/\s(?:A|B|C|D)[\)\.:]\s*/i);
+
+  if (!optionMarker || optionMarker.index === undefined || optionMarker.index <= 0) {
+    return normalized;
+  }
+
+  return normalized.slice(0, optionMarker.index).trim();
+}
+
+function normalizeChoiceText(text: string) {
+  const normalized = normalizeWhitespace(text);
+  return normalized
+    .replace(/^\(?[A-Da-d]\)?[\)\.:\-\u2013\u2014]\s*/, "")
+    .replace(/^\(?\d+\)?[\)\.:\-\u2013\u2014]\s+/, "");
+}
+
+function normalizeQuestionSignature(text: string, topic?: string) {
+  const normalized = normalizeWhitespace(text).toLowerCase();
+
+  // For number-patterns, dedupe by numeric sequence so minor wording changes
+  // (language stem variations) do not bypass uniqueness checks.
+  if (topic === "number-patterns") {
+    const nums = normalized.match(/\d+/g);
+    if (nums && nums.length >= 3) {
+      return `seq:${nums.join(",")}`;
+    }
+  }
+
+  return normalized;
+}
+
+function promptQuestionSignature(text: string, topic?: string) {
+  const signature = normalizeQuestionSignature(text, topic);
+
+  if (signature.startsWith("seq:")) {
+    return signature;
+  }
+
+  return signature.slice(0, 64);
+}
+
+function sanitizeGeneratedQuestionText(text: string) {
+  const normalized = stripEmbeddedOptions(text);
+  const optionPattern = /(?:^|\s)(?:A|B|C|D)[\)\.:]\s*/gi;
+  const matches = Array.from(normalized.matchAll(optionPattern));
+
+  if (matches.length > 0) {
+    const firstMarker = matches[0];
+    if (firstMarker.index !== undefined && firstMarker.index > 0) {
+      return normalized.slice(0, firstMarker.index).trim();
+    }
+  }
+
+  return normalized
+    .replace(/\s*[A-D][\)\.:]\s*.*$/i, "")
+    .replace(/\s*\d+[\)\.:]\s*.*$/i, "")
+    .trim();
+}
+
+function cleanOptions(q: GeneratedQuestion) {
+  const normalizedOptions = q.options.map((option) => normalizeChoiceText(String(option))).filter(Boolean);
+  const correctIndex = Math.min(Math.max(q.answerIndex, 0), 3);
+  const correctOption = normalizedOptions[correctIndex] ?? normalizedOptions[0] ?? "";
+  const unique = Array.from(new Set(normalizedOptions)).filter(Boolean);
+
+  if (!correctOption) {
+    return q;
+  }
+
+  if (!unique.includes(correctOption)) {
+    unique[0] = correctOption;
+  }
+
+  while (unique.length < 4) {
+    unique.push(String(Math.floor(Math.random() * 50) + 1));
+  }
+
+  const shuffled = unique.slice(0, 4).sort(() => Math.random() - 0.5);
+
+  return {
+    ...q,
+    options: shuffled as [string, string, string, string],
+    answerIndex: shuffled.indexOf(correctOption),
+  };
+}
+
+function fixNumberPatternAnswer(q: GeneratedQuestion) {
+  try {
+    const nums = q.question.match(/\d+/g)?.map(Number);
+    if (!nums || nums.length < 3) return q;
+
+    const diffs: number[] = [];
+    for (let i = 1; i < nums.length; i++) {
+      diffs.push(nums[i] - nums[i - 1]);
+    }
+
+    if (diffs.length < 2) return q;
+
+    const step = diffs[1] - diffs[0];
+    const nextDiff = diffs[diffs.length - 1] + step;
+    const expected = nums[nums.length - 1] + nextDiff;
+
+    const options = q.options.map((option) => Number(option));
+    if (options.some((option) => Number.isNaN(option))) return q;
+
+    if (!options.includes(expected)) {
+      options[0] = expected;
+    }
+
+    const shuffled = options.slice(0, 4).sort(() => Math.random() - 0.5);
+
+    return {
+      ...q,
+      options: shuffled.map(String) as [string, string, string, string],
+      answerIndex: Math.max(shuffled.indexOf(expected), 0),
+    };
+  } catch {
+    return q;
+  }
+}
+
+function validateQuestion(q: GeneratedQuestion) {
+  if (!q.question.trim()) return false;
+  if (!Array.isArray(q.options) || q.options.length !== 4) return false;
+  if (q.answerIndex < 0 || q.answerIndex > 3) return false;
+
+  const correct = q.options[q.answerIndex];
+  if (!correct || correct.trim() === "") return false;
+
+  return new Set(q.options.map((option) => normalizeChoiceText(String(option)))).size === 4;
+}
+
+function isValidNumberPattern(q: GeneratedQuestion) {
+  const seqMatch = q.question.match(/(?:\d+\s*[,\s]\s*){2,}\d+/);
+  if (!seqMatch) return false;
+
+  const nums = q.question.match(/\d+/g)?.map(Number);
+  if (!nums || nums.length < 3) return false;
+
+  const diffs: number[] = [];
+  for (let i = 1; i < nums.length; i++) {
+    diffs.push(nums[i] - nums[i - 1]);
+  }
+
+  // Check if it's a constant arithmetic sequence (all diffs the same)
+  const isConstant = diffs.every((d) => d === diffs[0]);
+  if (isConstant) return true;
+
+  // Also accept second-order arithmetic sequences (differences form arithmetic sequence)
+  // E.g., 2, 6, 12, 20 has diffs [4, 6, 8] which have constant second-order diff [2, 2]
+  if (diffs.length >= 2) {
+    const secondDiffs: number[] = [];
+    for (let i = 1; i < diffs.length; i++) {
+      secondDiffs.push(diffs[i] - diffs[i - 1]);
+    }
+    const isSecondOrderArithmetic = secondDiffs.every((d) => d === secondDiffs[0]);
+    if (isSecondOrderArithmetic && secondDiffs[0] !== 0) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+function isCorrectLanguage(text: string, language: string) {
+  if (language === "Marathi" || language === "Hindi") {
+    // Allow Devanagari + occasional Latin concept terms and math symbols used in explanations.
+    return /^[\u0900-\u097F\u200C\u200DA-Za-z0-9\s,.\-?!:()+=%/*×]+$/.test(text);
+  }
+
+  if (language === "English") {
+    // Allow letters, numbers, punctuation, and common math symbols.
+    return /^[A-Za-z0-9\s,.\-?!:()+=%/*×]+$/.test(text);
+  }
+
+  return true;
+}
+
+async function callLLM(system: string, user: string, maxTokens = 800, temperature = 0.1) {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
+    console.error("GROQ_API_KEY missing");
+    return "";
+  }
+
+  try {
+    const res = await fetch(GROQ_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        temperature,
+        max_tokens: maxTokens,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      console.log("❌ GROQ ERROR:", err);
+      return "";
+    }
+
+    const data = await res.json();
+    return data?.choices?.[0]?.message?.content || "";
+  } catch (err) {
+    console.log("❌ FETCH ERROR:", err instanceof Error ? err.message : err);
+    return "";
+  }
+}
+
+const parseQuestions = (raw: string) => {
+  try {
+    const cleaned = raw
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+
+    const parsed = JSON.parse(cleaned);
+
+    if (!parsed.questions || !Array.isArray(parsed.questions)) {
+      return [];
+    }
+
+    return parsed.questions;
+  } catch {
+    console.log("❌ JSON parse failed");
+    return [];
+  }
+};
+
+async function generateBatch(
+  topic: string,
+  difficulty: string,
+  count: number,
+  language: string,
+  blockedQuestionSignatures: string[] = [],
+  attempt = 1
+) {
+  const apiKey = process.env.GROQ_API_KEY;
+  if (!apiKey) {
+    console.error("❌ GROQ_API_KEY is not set in environment");
+    return [];
+  }
+
+  let exampleQuestion = "";
+  let exampleExplanation = "";
+
+  // Set topic-specific examples based on the topic parameter
+  if (topic === "number-patterns") {
+    if (language === "Hindi") {
+      exampleQuestion = "अगली संख्या खोजो: 2, 6, 12, 20, ?";
+      exampleExplanation = "यह quadratic pattern है क्योंकि क्रमांतर (4, 6, 8) खुद arithmetic sequence बना रहे हैं। अगला अंतर 10 होगा। इसलिए अगली संख्या = 20 + 10 = 30।";
+    } else if (language === "Marathi") {
+      exampleQuestion = "पुढील संख्या कोणती: 3, 6, 9, 12, ?";
+      exampleExplanation = "यह arithmetic progression है कारण फरक 3, 3, 3 स्थिर है। पुढील संख्या = 12 + 3 = 15।";
+    } else {
+      exampleQuestion = "Find the next term in the sequence: 2, 6, 12, 20, ?";
+      exampleExplanation = "This is a quadratic pattern where differences form an arithmetic sequence (4, 6, 8). Next difference = 10. So next term = 20 + 10 = 30.";
+    }
+  } else if (topic === "percentage") {
+    if (language === "Hindi") {
+      exampleQuestion = "150 का 20% क्या है?";
+      exampleExplanation = "Percentage formula: (प्रतिशत/100) × संख्या। यहां: (20/100) × 150 = 0.20 × 150 = 30। यह percentage की basic concept है।";
+    } else if (language === "Marathi") {
+      exampleQuestion = "150 च्या 20% किती आहे?";
+      exampleExplanation = "Percentage सूत्र: (प्रतिशत/100) × संख्या। येथे: (20/100) × 150 = 30। यह percentage calculation की concept है।";
+    } else {
+      exampleQuestion = "What is 20% of 150?";
+      exampleExplanation = "Percentage formula: (percentage/100) × value. Here: (20/100) × 150 = 30. This teaches how to calculate percentage of any number.";
+    }
+  } else {
+    // For all other topics, provide a generic fallback example
+    if (language === "Hindi") {
+      exampleQuestion = "एक सवाल का उदाहरण।";
+      exampleExplanation = "यह एक उदाहरण स्पष्टीकरण है जो concept समझाता है।";
+    } else if (language === "Marathi") {
+      exampleQuestion = "एक प्रश्नाचे उदाहरण।";
+      exampleExplanation = "हे एक उदाहरण स्पष्टीकरण आहे जे concept समजते।";
+    } else {
+      exampleQuestion = "Example question for this topic.";
+      exampleExplanation = "This is an example explanation that teaches the underlying concept.";
+    }
+  }
+
+  const blockedList = blockedQuestionSignatures.slice(0, 15);
+  const blockedClause = blockedList.length
+    ? `\nDO NOT REPEAT THESE QUESTION SIGNATURES:\n${blockedList.map((value) => `- ${promptQuestionSignature(value, topic)}`).join("\n")}`
+    : "";
+
+  // Build topic-specific examples with DO's and DON'Ts for conceptual learning
+  let topicGuidance = "";
+  if (topic === "number-patterns") {
+    topicGuidance = `TOPIC: Number Patterns & Sequences
+CONCEPTS TO MASTER:
+- Arithmetic Progressions: constant difference between consecutive terms
+- Geometric Progressions: constant ratio between consecutive terms  
+- Quadratic/Compound Patterns: difference of differences changes
+- Mixed Patterns: combination of different rules
+
+EXAMPLE QUESTION (to understand concept, NOT to memorize format):
+"पुढील संख्या कोणती: 2, 6, 12, 20, ?"
+Explanation: यह quadratic pattern है - differences are 4, 6, 8 (अगला 10 होगा)। Answer: 30
+
+DO's:
+✓ Practice identifying CONCEPTS: Is difference constant? Is there a ratio? Are differences changing?
+✓ Generate VARIOUS FORMATS of same concept
+✓ Mix different pattern types in questions
+
+DON'Ts:
+✗ Do NOT memorize specific question formats
+✗ Do NOT expect all questions to follow the exact example structure
+✗ Do NOT assume you know which patterns will appear
+
+GENERATION RULE: Create diverse questions using arithmetic, geometric, or compound patterns. Options must be 4 distinct numbers.`;
+  } else if (topic === "percentage") {
+    topicGuidance = `TOPIC: Percentage Calculations
+CONCEPTS TO MASTER:
+- Finding percentage of a number: (percentage/100) × number
+- Finding what percentage one value is of another
+- Percentage increase/decrease applications
+- Real-world percentage problems
+
+EXAMPLE QUESTION (to understand concept, NOT to memorize format):
+"150 का 20% क्या है?"
+Explanation: 20% of 150 = (20/100) × 150 = 30। यह percentage का basic concept है।
+
+DO's:
+✓ Understand the FORMULA: (P/100) × Value = Result
+✓ Practice various number combinations
+✓ Learn to identify percentage scenarios in real life
+
+DON'Ts:
+✗ Do NOT memorize the exact question format shown
+✗ Do NOT expect all questions to ask "What is X% of Y?"
+✗ Do NOT assume you know which numbers will appear
+
+GENERATION RULE: Create varied percentage questions using different numbers and scenarios. Options must be 4 DISTINCT INTEGER answers (NO decimals like 30.0 or 30.00).`;
+  } else {
+    topicGuidance = `Generate questions specifically for the topic: ${topic}.
+Focus on conceptual understanding, not memorizing patterns.
+Options must be 4 distinct answers.`;
+  }
+
+  const system = `
+You are a STRICT JSON generator for math questions on topic: ${topic}.
+
+RULES:
+- Output ONLY valid JSON, nothing else
+- Ensure all JSON is properly closed
+- Do NOT add any text outside the JSON
+- Every generated question must be unique (no duplicates)
+- Generate ONLY ${topic} questions, NOT other topics
+
+LANGUAGE:
+- Generate all questions ONLY in ${language}
+- Use only ${language} words throughout
+- Do NOT mix English with ${language}
+
+CONCEPTUAL GUIDANCE (Help students learn concepts, not memorize patterns):
+${topicGuidance}
+
+EXAMPLE for ${language}:
+Question: "${exampleQuestion}"
+Options: ["26", "30", "28", "32"]
+Answer Index: 1
+Explanation: "${exampleExplanation}"
+${blockedClause}
+
+OUTPUT FORMAT (REQUIRED):
+{
+  "questions": [
+    {
+      "question": "[FULL QUESTION IN ${language}]",
+      "options": ["[ANSWER1]", "[ANSWER2]", "[ANSWER3]", "[ANSWER4]"],
+      "answerIndex": [0-3],
+      "explanation": "[CONCEPTUAL EXPLANATION that teaches WHY this is correct, not just the answer]"
+    }
+  ]
+}
+
+EXPLANATION REQUIREMENTS (CRITICAL):
+- MUST teach the CONCEPT/PRINCIPLE being tested
+- MUST explain WHY this is the correct answer
+- MUST help students understand the METHOD, not just memorize
+- Example GOOD: "यह quadratic pattern है क्योंकि differences (4, 6, 8) खुद arithmetic sequence बना रहे हैं"
+- Example BAD: "The answer is 30" or "26 + 4 = 30"
+
+Generate ${count} UNIQUE, CONCEPTUAL ${topic} questions in JSON format.
+`;
+
+  console.log(`[generateBatch] Using language: ${language}`);
+  console.log(`[generateBatch] Example question: ${exampleQuestion}`);
+
+  // Marathi/Hindi text takes more tokens per character than English
+  // Increase token budget for non-English languages
+  const maxTokensForLanguage = (language === "English") ? 800 : 1600;
+
+  const variationSeed = `${Date.now()}-${attempt}-${Math.random().toString(36).slice(2, 8)}`;
+  const raw = await callLLM(
+    system,
+    `Generate now. Variation seed: ${variationSeed}`,
+    maxTokensForLanguage,
+    0.3
+  );
+  console.log(`[generateBatch] Raw response (first 200 chars): ${raw.slice(0, 200)}`);
+
+  const items = parseQuestions(raw);
+  console.log(`[generateBatch] Parsed ${items.length} items from response`);
+  
+  // For percentage topic, log the full raw response if parsing failed
+  if (topic === "percentage" && items.length === 0) {
+    console.log(`[generateBatch] PERCENTAGE PARSE FAILED. Full response:\n${raw.slice(0, 500)}`);
+  }
+
+  if (!items || items.length === 0) {
+    try {
+      const meta = `topic:${topic}\ndifficulty:${difficulty}\nlanguage:${language}\nrawLength:${String(raw?.length ?? 0)}\n`;
+      dumpNvidiaDebug(`failed-${topic}-${difficulty}-${language}`, `${meta}\n${raw}`);
+    } catch (e) {
+      console.log("[generateBatch] failed to write debug dump:", e instanceof Error ? e.message : e);
+    }
+  }
+
+  const structured1 = items
+    .filter((q: unknown) => {
+      if (!q || typeof q !== "object") return false;
+      const item = q as Record<string, unknown>;
+      return !!item["question"] && Array.isArray(item["options"]) && (item["options"] as unknown[]).length === 4;
+    });
+  
+  console.log(`[generateBatch] After structure check: ${structured1.length} questions`);
+  if (topic !== "number-patterns") {
+    structured1.forEach((q: unknown, i: number) => {
+      const item = q as Record<string, unknown>;
+      console.log(`  [${i}] Q: "${String(item["question"] ?? "").slice(0, 60)}" | Opts: ${JSON.stringify(item["options"] ?? [])}`);
+    });
+  }
+
+  const structured2 = structured1
+    .map((q: unknown, i: number) => {
+      const item = q as Record<string, unknown>;
+      const questionText = sanitizeGeneratedQuestionText(String(item["question"] ?? ""));
+      const options = (item["options"] as unknown[]).map((o) => normalizeChoiceText(String(o)));
+      const answerIndex = typeof item["answerIndex"] === "number" ? (item["answerIndex"] as number) : 0;
+      const explanation = normalizeWhitespace(String(item["explanation"] ?? ""));
+      return {
+        id: `q-${Date.now()}-${i}`,
+        question: questionText,
+        options: options as [string, string, string, string],
+        answerIndex: Math.min(Math.max(answerIndex ?? 0, 0), 3),
+        explanation,
+        difficulty,
+      };
+    });
+  
+  console.log(`[generateBatch] After mapping: ${structured2.length} questions`);
+
+  const structured3 = structured2
+    .map((q: GeneratedQuestion) => cleanOptions(q));
+  
+  console.log(`[generateBatch] After cleanOptions: ${structured3.length} questions`);
+
+  const structured4 = structured3
+    .map((q: GeneratedQuestion) => (topic === "number-patterns" ? fixNumberPatternAnswer(q) : q));
+  
+  console.log(`[generateBatch] After fix/passthrough: ${structured4.length} questions`);
+
+  const structuredQuestions = structured4
+    .filter((q: GeneratedQuestion) => {
+      const passes = validateQuestion(q);
+      if (!passes) {
+        if (topic === "percentage") console.log(`  [FILTER] validateQuestion failed: "${q.question.slice(0, 60)}" | opts: ${JSON.stringify(q.options)} | idx: ${q.answerIndex}`);
+        return false;
+      }
+      
+      const fullText = q.question + q.options.join(" ") + q.explanation;
+      const langOk = isCorrectLanguage(fullText, language);
+      if (!langOk) {
+          if (topic === "percentage") console.log(`  [FILTER] language check failed for: "${q.question.slice(0, 60)}"`);
+        return false;
+      }
+
+      if (topic === "number-patterns") {
+        const patternOk = isValidNumberPattern(q);
+        if (!patternOk) {
+          console.log(`  [FILTER] isValidNumberPattern failed: "${q.question.slice(0, 60)}"`);
+        }
+        return patternOk;
+      }
+
+      if (topic === "percentage") {
+        console.log(`  [PASS] Percentage question passed all filters: "${q.question.slice(0, 60)}" | opts: ${JSON.stringify(q.options)} | idx: ${q.answerIndex}`);
+      }
+      return true;
+    });
+
+  console.log(`[generateBatch] Final structured questions: ${structuredQuestions.length}`);
+  return structuredQuestions;
+}
+
+export async function generateFastQuestions({
+  topic,
+  difficulty,
+  count,
+  language = "English",
+  blockedQuestionSignatures = [],
+}: {
+  topic: string;
+  difficulty: string;
+  count: number;
+  language?: string;
+  blockedQuestionSignatures?: string[];
+}) {
+  const questions: GeneratedQuestion[] = [];
+  const maxAttempts = Math.max(3, Math.ceil(count / 2) + 1);
+  const deadline = Date.now() + QUESTION_GENERATION_BUDGET_MS;
+  let attempts = 0;
+  const seen = new Set<string>(
+    blockedQuestionSignatures.map((value) => normalizeQuestionSignature(value, topic))
+  );
+
+  while (questions.length < count && attempts < maxAttempts && Date.now() < deadline) {
+    attempts += 1;
+    const remaining = count - questions.length;
+    const candidateCount = Math.min(8, Math.max(remaining + 2, 3));
+    const batch = await generateBatch(
+      topic,
+      difficulty,
+      candidateCount,
+      language,
+      Array.from(seen),
+      attempts
+    );
+
+    for (const q of batch) {
+      const signature = normalizeQuestionSignature(q.question, topic);
+      if (!signature || seen.has(signature)) {
+        continue;
+      }
+
+      seen.add(signature);
+
+      if (!questions.some((x) => normalizeQuestionSignature(x.question, topic) === signature)) {
+        questions.push(q);
+      }
+    }
+
+    if (batch.length === 0) {
+      console.log(`[generateFastQuestions] Empty batch at attempt ${attempts}, continuing`);
+      continue;
+    }
+  }
+
+  const finalQuestions = questions.slice(0, count);
+  console.log(`[generateFastQuestions] Completed: got ${finalQuestions.length}/${count} questions in ${attempts} attempts, ${Date.now() - deadline + QUESTION_GENERATION_BUDGET_MS}ms elapsed`);
+
+  return finalQuestions;
+}
 
 export async function getMathExplanation(
   topic: string,
@@ -7,1139 +627,38 @@ export async function getMathExplanation(
   options: string[],
   correctAnswer: string,
   baseExplanation: string,
-  language: string = "Hindi",
+  language = "English"
 ) {
-  const apiKey = process.env.NVIDIA_API_KEY;
-
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing NVIDIA_API_KEY environment variable.");
+    return baseExplanation || `Final Answer: ${correctAnswer}`;
   }
 
-  try {
-    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "meta/llama-3.1-8b-instruct",
-        messages: [
-          {
-            role: "system",
-            content: [
-              `You are a helpful NavGurukul math mentor. Reply only in ${language}.`,
-              "Keep the explanation concise, accurate, and student-friendly.",
-              "Use baseExplanation as source of truth and keep final numeric answer exactly same.",
-            ].join(" "),
-          },
-          {
-            role: "user",
-            content: [
-              `Topic: ${topic}`,
-              `Question: ${question}`,
-              `Correct Answer (must use exactly): ${correctAnswer}`,
-              `Base Explanation (source of truth): ${baseExplanation}`,
-              "Rewrite in 2-4 short lines and end with: Final Answer: <correct answer>",
-            ].join("\n"),
-          },
-        ],
-        temperature: 0,
-        max_tokens: 120,
-      }),
-    });
+  const system = `
+You are an expert math teacher.
 
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
-    }
+Explain the answer in ${language}.
 
-    const data = await response.json();
-    const raw = data?.choices?.[0]?.message?.content ?? "I could not generate an explanation right now.";
-    const cleaned = raw
-      .replace(/(?:Final\s*Answer|Answer)\s*:\s*.*/gi, "")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    return `${cleaned}\nFinal Answer: ${correctAnswer}`;
-  } catch (error) {
-    console.error("NVIDIA API Error:", error);
-    return "Sorry, I couldn't generate an explanation right now.";
-  }
+Rules:
+- Explain it properly for a student who is learning the concept.
+- Use 3 short steps or 3 short lines: identify the pattern, apply the rule, state the answer.
+- Use simple student-friendly language.
+- Do not change the correct answer.
+- If ${language} is not English, keep the explanation fully in ${language}.
+- For Hindi and Marathi, use Devanagari script only. Do not use Latin transliteration.
+- Return only the explanation text.
+`;
+
+  const user = `
+Topic: ${topic}
+Question: ${question}
+Options: ${options.join(" | ")}
+Correct Answer: ${correctAnswer}
+Base Explanation: ${baseExplanation}
+`;
+
+  const raw = await callLLM(system, user, 300);
+  const explanation = raw.trim();
+
+  return explanation || baseExplanation || `Final Answer: ${correctAnswer}`;
 }
-
-type GenerateQuestionParams = {
-  topic: string;
-  difficulty: Difficulty;
-  count: number;
-  language?: string;
-  variationSeed?: number | string;
-  blockedQuestionSignatures?: string[];
-};
-
-type GeneratedQuestionTranslation = {
-  question: string;
-  options: [string, string, string, string];
-  explanation: string;
-};
-
-function extractJsonCandidates(raw: string) {
-  const candidates: string[] = [];
-  const fenceMatches = raw.match(/```(?:json)?\s*([\s\S]*?)```/gi);
-
-  if (fenceMatches) {
-    for (const match of fenceMatches) {
-      const contentMatch = match.match(/```(?:json)?\s*([\s\S]*?)```/i);
-      const content = contentMatch?.[1]?.trim();
-      if (content) {
-        candidates.push(content);
-      }
-    }
-  }
-
-  candidates.push(raw.trim());
-
-  return candidates.filter(Boolean);
-}
-
-function findBalancedJsonSegment(raw: string, openChar: "{" | "[", closeChar: "}" | "]") {
-  let depth = 0;
-  let inString = false;
-  let escaped = false;
-  let startIndex = -1;
-
-  for (let index = 0; index < raw.length; index += 1) {
-    const char = raw[index];
-
-    if (inString) {
-      if (escaped) {
-        escaped = false;
-      } else if (char === "\\") {
-        escaped = true;
-      } else if (char === '"') {
-        inString = false;
-      }
-      continue;
-    }
-
-    if (char === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (char === openChar) {
-      if (depth === 0) {
-        startIndex = index;
-      }
-      depth += 1;
-      continue;
-    }
-
-    if (char === closeChar && depth > 0) {
-      depth -= 1;
-      if (depth === 0 && startIndex !== -1) {
-        return raw.slice(startIndex, index + 1);
-      }
-    }
-  }
-
-  return null;
-}
-
-function normalizeQuestionSignature(question: string) {
-  return question.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-function normalizeOptionSignature(option: string) {
-  return option
-    .replace(/^[A-Da-d][\).:-]?\s*/, "")
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function stripOptionPrefix(option: string) {
-  return option.replace(/^[A-Da-d][\).:-]?\s*/, "").trim();
-}
-
-function parseOptionNumber(value: string) {
-  const match = value.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
-  if (!match) {
-    return null;
-  }
-
-  const parsed = Number(match[0]);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function formatNumericOption(value: number) {
-  if (Number.isInteger(value)) {
-    return String(value);
-  }
-
-  return Number(value.toFixed(2)).toString();
-}
-
-function detectNextPatternAnswer(question: string) {
-  const lower = question.toLowerCase();
-  const isPatternPrompt =
-    lower.includes("next number") ||
-    lower.includes("next term") ||
-    lower.includes("pattern") ||
-    lower.includes("sequence") ||
-    lower.includes("अगली") ||
-    lower.includes("पुढ") ||
-    lower.includes("क्रम");
-
-  if (!isPatternPrompt) {
-    return null;
-  }
-
-  const values = (question.match(/-?\d+(?:\.\d+)?/g) ?? []).map((value) => Number(value));
-  const numbers = values.filter((value) => Number.isFinite(value));
-
-  if (numbers.length < 3) {
-    return null;
-  }
-
-  const diffs = numbers.slice(1).map((value, index) => value - numbers[index]);
-  const firstDiff = diffs[0];
-  if (diffs.every((diff) => Math.abs(diff - firstDiff) < 1e-9)) {
-    return numbers[numbers.length - 1] + firstDiff;
-  }
-
-  if (numbers.every((value) => Math.abs(value) > 1e-9)) {
-    const ratios = numbers.slice(1).map((value, index) => value / numbers[index]);
-    const firstRatio = ratios[0];
-    if (Number.isFinite(firstRatio) && ratios.every((ratio) => Math.abs(ratio - firstRatio) < 1e-9)) {
-      return numbers[numbers.length - 1] * firstRatio;
-    }
-  }
-
-  if (diffs.length >= 2) {
-    const secondDiffs = diffs.slice(1).map((value, index) => value - diffs[index]);
-    const firstSecondDiff = secondDiffs[0];
-    if (secondDiffs.every((diff) => Math.abs(diff - firstSecondDiff) < 1e-9)) {
-      const nextDiff = diffs[diffs.length - 1] + firstSecondDiff;
-      return numbers[numbers.length - 1] + nextDiff;
-    }
-  }
-
-  return null;
-}
-
-function enforcePatternAnswerConsistency(options: [string, string, string, string], answerIndex: number, question: string) {
-  const computedAnswer = detectNextPatternAnswer(question);
-  if (computedAnswer === null) {
-    return { options, answerIndex };
-  }
-
-  const parsedOptions = options.map((option) => parseOptionNumber(option));
-  let correctedIndex = parsedOptions.findIndex(
-    (value) => value !== null && Math.abs((value as number) - computedAnswer) < 1e-9,
-  );
-
-  const updatedOptions = [...options] as [string, string, string, string];
-
-  if (correctedIndex === -1) {
-    const replacementIndex = 3;
-    updatedOptions[replacementIndex] = formatNumericOption(computedAnswer);
-    correctedIndex = replacementIndex;
-  }
-
-  return { options: updatedOptions, answerIndex: correctedIndex };
-}
-
-function matchesSelectedLanguage(text: string, language: "English" | "Hindi" | "Marathi") {
-  const latinLetters = (text.match(/[A-Za-z]/g) ?? []).length;
-  const devanagariLetters = (text.match(/[\u0900-\u097F]/g) ?? []).length;
-
-  if (language === "English") {
-    return latinLetters >= devanagariLetters;
-  }
-
-  // Hindi/Marathi both use Devanagari; reject mixed English text.
-  return devanagariLetters > 0 && latinLetters === 0;
-}
-
-function normalizeQuestionTranslation(
-  rawTranslation: unknown,
-  fallbackQuestion: string,
-  fallbackExplanation: string,
-  fallbackOptions: [string, string, string, string],
-) {
-  if (!rawTranslation || typeof rawTranslation !== "object") {
-    return undefined;
-  }
-
-  const record = rawTranslation as Record<string, unknown>;
-  const question = typeof record.question === "string" ? record.question.trim() : "";
-  const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
-  const options = Array.isArray(record.options)
-    ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
-    : [];
-
-  if (!question && !explanation) {
-    return undefined;
-  }
-
-  return {
-    question: question || fallbackQuestion,
-    options:
-      options.length === 4
-        ? [options[0], options[1], options[2], options[3]] as [string, string, string, string]
-        : fallbackOptions,
-    explanation: explanation || fallbackExplanation,
-  };
-}
-
-function normalizeGeneratedQuestions(
-  questions: unknown,
-  topic: string,
-  difficulty: Difficulty,
-  count: number,
-  blockedSignatures: Set<string>,
-  language: "English" | "Hindi" | "Marathi",
-): TopicQuestion[] {
-  if (!Array.isArray(questions)) {
-    return [];
-  }
-
-  const normalized: TopicQuestion[] = [];
-  const seenSignatures = new Set<string>();
-
-  for (const [index, item] of questions.entries()) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const record = item as Record<string, unknown>;
-    const question = typeof record.question === "string" ? record.question.trim() : "";
-    const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
-    let answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
-    const options = Array.isArray(record.options)
-      ? record.options
-          .filter((value): value is string => typeof value === "string")
-          .map((value: string) => stripOptionPrefix(value.trim()))
-      : [];
-
-    const consistency =
-      options.length === 4
-        ? enforcePatternAnswerConsistency([options[0], options[1], options[2], options[3]], answerIndex, question)
-        : null;
-
-    const safeOptions = consistency ? consistency.options : ([options[0], options[1], options[2], options[3]] as [string, string, string, string]);
-    if (consistency) {
-      answerIndex = consistency.answerIndex;
-    }
-    const translationsRecord = record.translations && typeof record.translations === "object"
-      ? (record.translations as Record<string, unknown>)
-      : null;
-    const translations = translationsRecord
-      ? {
-          English: normalizeQuestionTranslation(translationsRecord.English, question, explanation, safeOptions),
-          Hindi: normalizeQuestionTranslation(translationsRecord.Hindi, question, explanation, safeOptions),
-          Marathi: normalizeQuestionTranslation(translationsRecord.Marathi, question, explanation, safeOptions),
-        }
-      : undefined;
-
-    if (!question || !explanation || options.length !== 4 || answerIndex < 0 || answerIndex > 3) {
-      continue;
-    }
-
-    if (!matchesSelectedLanguage(question, language)) {
-      continue;
-    }
-
-    if (!matchesSelectedLanguage(explanation, language)) {
-      continue;
-    }
-
-    const normalizedOptionSet = new Set(safeOptions.map((option) => normalizeOptionSignature(option)));
-    if (normalizedOptionSet.size !== 4 || Array.from(normalizedOptionSet).some((option) => option.length === 0)) {
-      continue;
-    }
-
-    const signature = normalizeQuestionSignature(question);
-    if (seenSignatures.has(signature) || blockedSignatures.has(signature)) {
-      continue;
-    }
-
-    seenSignatures.add(signature);
-
-    normalized.push({
-      id: `llm-${topic}-${difficulty}-${Date.now()}-${index}`,
-      difficulty,
-      question,
-      options: safeOptions,
-      answerIndex,
-      explanation,
-      translations,
-    });
-
-    if (normalized.length >= count) {
-      break;
-    }
-  }
-
-  return normalized;
-}
-
-function buildBlockedPatternLine(blockedQuestionSignatures: string[]) {
-  const recent = blockedQuestionSignatures.slice(-10).filter(Boolean);
-
-  if (recent.length === 0) {
-    return "None";
-  }
-
-  return recent.join(" | ");
-}
-
-async function requestNvidiaBatch(prompt: {
-  systemPrompt: string;
-  userPrompt: string;
-  apiKey: string;
-  temperature: number;
-  max_tokens: number;
-  top_p: number;
-  timeoutMs?: number;
-}): Promise<string> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), prompt.timeoutMs ?? 45000);
-
-  try {
-    const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${prompt.apiKey}`,
-        "Content-Type": "application/json",
-      },
-      signal: controller.signal,
-      body: JSON.stringify({
-        model: "meta/llama-3.1-8b-instruct",
-        messages: [
-          { role: "system", content: prompt.systemPrompt },
-          { role: "user", content: prompt.userPrompt },
-        ],
-        temperature: prompt.temperature,
-        max_tokens: prompt.max_tokens,
-        top_p: prompt.top_p,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
-    }
-
-    const data = await response.json();
-    return String(data?.choices?.[0]?.message?.content ?? "");
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
-
-function parseNvidiaQuestionBlock(raw: string) {
-  for (const candidate of extractJsonCandidates(raw)) {
-    const directCandidates = [
-      candidate,
-      findBalancedJsonSegment(candidate, "{", "}"),
-      findBalancedJsonSegment(candidate, "[", "]"),
-    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-
-    for (const directCandidate of directCandidates) {
-      try {
-        const parsed = JSON.parse(directCandidate.trim()) as unknown;
-
-        if (Array.isArray(parsed)) {
-          return { questions: parsed };
-        }
-
-        if (parsed && typeof parsed === "object") {
-          const record = parsed as { questions?: unknown };
-          if (Array.isArray(record.questions)) {
-            return record;
-          }
-        }
-      } catch {
-        // Keep trying the next candidate.
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseNvidiaTranslationBlock(raw: string) {
-  for (const candidate of extractJsonCandidates(raw)) {
-    const directCandidates = [
-      candidate,
-      findBalancedJsonSegment(candidate, "{", "}"),
-      findBalancedJsonSegment(candidate, "[", "]"),
-    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-
-    for (const directCandidate of directCandidates) {
-      try {
-        const parsed = JSON.parse(directCandidate.trim()) as unknown;
-
-        if (Array.isArray(parsed)) {
-          return { translations: parsed };
-        }
-
-        if (parsed && typeof parsed === "object") {
-          const record = parsed as { translations?: unknown };
-          if (Array.isArray(record.translations)) {
-            return record;
-          }
-        }
-      } catch {
-        // Keep trying candidates.
-      }
-    }
-  }
-
-  return null;
-}
-
-function parseNvidiaVerificationBlock(raw: string) {
-  for (const candidate of extractJsonCandidates(raw)) {
-    const directCandidates = [
-      candidate,
-      findBalancedJsonSegment(candidate, "{", "}"),
-      findBalancedJsonSegment(candidate, "[", "]"),
-    ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-
-    for (const directCandidate of directCandidates) {
-      try {
-        const parsed = JSON.parse(directCandidate.trim()) as unknown;
-
-        if (Array.isArray(parsed)) {
-          return { checks: parsed };
-        }
-
-        if (parsed && typeof parsed === "object") {
-          const record = parsed as { checks?: unknown; results?: unknown };
-          if (Array.isArray(record.checks)) {
-            return { checks: record.checks };
-          }
-          if (Array.isArray(record.results)) {
-            return { checks: record.results };
-          }
-        }
-      } catch {
-        // Keep trying candidates.
-      }
-    }
-  }
-
-  return null;
-}
-
-async function verifyQuestionChunkAccuracy(
-  chunk: TopicQuestion[],
-  apiKey: string,
-  language: "English" | "Hindi" | "Marathi",
-): Promise<TopicQuestion[]> {
-  if (chunk.length === 0) {
-    return chunk;
-  }
-
-  const systemPrompt = [
-    "You are a strict math MCQ validator.",
-    "Solve each question and correct answerIndex if needed.",
-    "If no option matches the true answer, replace exactly one option with the correct value and set answerIndex accordingly.",
-    "Keep question text unchanged.",
-    `Keep explanation in ${language}.`,
-    "Return valid JSON only. No markdown.",
-    'Schema: {"checks":[{"options":["...","...","...","..."],"answerIndex":0,"explanation":"..."}]}',
-  ].join(" ");
-
-  const payload = chunk.map((question) => ({
-    question: question.question,
-    options: question.options,
-    answerIndex: question.answerIndex,
-    explanation: question.explanation,
-  }));
-
-  const userPrompt = [
-    "Validate and correct each item.",
-    "Keep array length and order exactly the same.",
-    "Input JSON:",
-    JSON.stringify(payload),
-  ].join("\n");
-
-  const raw = await requestNvidiaBatch({
-    systemPrompt,
-    userPrompt,
-    apiKey,
-    temperature: 0,
-    max_tokens: 2600,
-    top_p: 1,
-    timeoutMs: 12000,
-  });
-
-  const parsed = parseNvidiaVerificationBlock(raw);
-  const checks = parsed?.checks;
-
-  if (!Array.isArray(checks)) {
-    return chunk;
-  }
-
-  const corrected: TopicQuestion[] = chunk.map((original, index) => {
-    const item = checks[index];
-    if (!item || typeof item !== "object") {
-      return original;
-    }
-
-    const record = item as Record<string, unknown>;
-    const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : original.answerIndex;
-    const optionsRaw = Array.isArray(record.options)
-      ? record.options
-          .filter((value): value is string => typeof value === "string")
-          .map((value: string) => stripOptionPrefix(value.trim()))
-      : original.options;
-    const explanation =
-      typeof record.explanation === "string" && record.explanation.trim().length > 0
-        ? record.explanation.trim()
-        : original.explanation;
-
-    if (optionsRaw.length !== 4 || answerIndex < 0 || answerIndex > 3) {
-      return original;
-    }
-
-    const optionSet = new Set(optionsRaw.map((option) => normalizeOptionSignature(option)));
-    if (optionSet.size !== 4) {
-      return original;
-    }
-
-    return {
-      ...original,
-      options: [optionsRaw[0], optionsRaw[1], optionsRaw[2], optionsRaw[3]] as [string, string, string, string],
-      answerIndex,
-      explanation,
-    };
-  });
-
-  const auditSystemPrompt = [
-    "You are an independent MCQ math auditor.",
-    "Do not trust the provided answerIndex; solve each question independently.",
-    "If the provided answerIndex is correct, mark isValid=true.",
-    "If it is wrong but a correct option exists, set isValid=true and provide corrected answerIndex.",
-    "If no option is mathematically correct, mark isValid=false.",
-    "Return valid JSON only. No markdown.",
-    'Schema: {"checks":[{"isValid":true,"answerIndex":0}]}',
-  ].join(" ");
-
-  const auditPrompt = [
-    "Audit these questions.",
-    "Keep array order and length same.",
-    "Input JSON:",
-    JSON.stringify(
-      corrected.map((question) => ({
-        question: question.question,
-        options: question.options,
-        answerIndex: question.answerIndex,
-        explanation: question.explanation,
-      })),
-    ),
-  ].join("\n");
-
-  try {
-    const auditRaw = await requestNvidiaBatch({
-      systemPrompt: auditSystemPrompt,
-      userPrompt: auditPrompt,
-      apiKey,
-      temperature: 0,
-      max_tokens: 1800,
-      top_p: 1,
-      timeoutMs: 9000,
-    });
-
-    const auditParsed = parseNvidiaVerificationBlock(auditRaw);
-    const auditChecks = auditParsed?.checks;
-
-    if (!Array.isArray(auditChecks)) {
-      return corrected;
-    }
-
-    const validated: TopicQuestion[] = [];
-
-    for (let index = 0; index < corrected.length; index += 1) {
-      const current = corrected[index];
-      const auditItem = auditChecks[index];
-
-      if (!auditItem || typeof auditItem !== "object") {
-        continue;
-      }
-
-      const auditRecord = auditItem as Record<string, unknown>;
-      const isValid =
-        auditRecord.isValid === true ||
-        auditRecord.valid === true ||
-        auditRecord.status === "valid";
-      const correctedAnswerIndex =
-        typeof auditRecord.answerIndex === "number" &&
-        auditRecord.answerIndex >= 0 &&
-        auditRecord.answerIndex <= 3
-          ? auditRecord.answerIndex
-          : current.answerIndex;
-
-      if (!isValid) {
-        continue;
-      }
-
-      validated.push({
-        ...current,
-        answerIndex: correctedAnswerIndex,
-      });
-    }
-
-    return validated;
-  } catch {
-    return corrected;
-  }
-}
-
-async function translateQuestionChunk(
-  chunk: TopicQuestion[],
-  targetLanguage: "Hindi" | "Marathi",
-  apiKey: string,
-): Promise<Array<GeneratedQuestionTranslation | null>> {
-  const systemPrompt = [
-    `You are a strict translation engine. Translate math MCQ text to ${targetLanguage}.`,
-    "Keep all numbers, symbols, equations, and numeric values unchanged.",
-    "Translate only natural language text in question/options/explanation.",
-    "Return only valid JSON. No markdown.",
-    'Schema: {"translations":[{"question":"...","options":["...","...","...","..."],"explanation":"..."}]}',
-  ].join(" ");
-
-  const sourcePayload = chunk.map((question) => ({
-    question: question.question,
-    options: question.options,
-    explanation: question.explanation,
-  }));
-
-  const userPrompt = [
-    `Translate all items to ${targetLanguage}.`,
-    "Keep array length and order exactly the same.",
-    "Input JSON:",
-    JSON.stringify(sourcePayload),
-  ].join("\n");
-
-  const raw = await requestNvidiaBatch({
-    systemPrompt,
-    userPrompt,
-    apiKey,
-    temperature: 0,
-    max_tokens: 2400,
-    top_p: 1,
-    timeoutMs: 16000,
-  });
-
-  const parsed = parseNvidiaTranslationBlock(raw);
-  const translations = parsed?.translations;
-  if (!Array.isArray(translations)) {
-    return chunk.map(() => null);
-  }
-
-  return chunk.map((_, index) => {
-    const item = translations[index];
-    if (!item || typeof item !== "object") {
-      return null;
-    }
-
-    const record = item as Record<string, unknown>;
-    const question = typeof record.question === "string" ? record.question.trim() : "";
-    const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
-    const options = Array.isArray(record.options)
-      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
-      : [];
-
-    if (!question || !explanation || options.length !== 4) {
-      return null;
-    }
-
-    return {
-      question,
-      options: [options[0], options[1], options[2], options[3]],
-      explanation,
-    };
-  });
-}
-
-async function attachAutoTranslations(questions: TopicQuestion[], apiKey: string) {
-  if (questions.length === 0) {
-    return questions;
-  }
-
-  const chunkSize = 8;
-  const translated = questions.map((question) => ({ ...question }));
-
-  for (let start = 0; start < translated.length; start += chunkSize) {
-    const chunk = translated.slice(start, start + chunkSize);
-
-    let hindiChunk: Array<GeneratedQuestionTranslation | null> = chunk.map(() => null);
-    let marathiChunk: Array<GeneratedQuestionTranslation | null> = chunk.map(() => null);
-
-    try {
-      hindiChunk = await translateQuestionChunk(chunk, "Hindi", apiKey);
-    } catch {
-      // Best effort; keep base text if translation fails.
-    }
-
-    try {
-      marathiChunk = await translateQuestionChunk(chunk, "Marathi", apiKey);
-    } catch {
-      // Best effort; keep base text if translation fails.
-    }
-
-    for (let index = 0; index < chunk.length; index += 1) {
-      const target = translated[start + index];
-      const baseOptions = target.options;
-      const baseExplanation = target.explanation;
-
-      target.translations = {
-        English: {
-          question: target.question,
-          options: baseOptions,
-          explanation: baseExplanation,
-        },
-        Hindi: hindiChunk[index]
-          ? {
-              question: hindiChunk[index]!.question,
-              options: hindiChunk[index]!.options,
-              explanation: hindiChunk[index]!.explanation,
-            }
-          : undefined,
-        Marathi: marathiChunk[index]
-          ? {
-              question: marathiChunk[index]!.question,
-              options: marathiChunk[index]!.options,
-              explanation: marathiChunk[index]!.explanation,
-            }
-          : undefined,
-      };
-    }
-  }
-
-  return translated;
-}
-
-async function repairNvidiaQuestionBlock(raw: string, apiKey: string, topic: string, difficulty: Difficulty, count: number) {
-  const repairSystemPrompt = [
-    "You are a strict JSON repair tool for math MCQs.",
-    "Convert the provided content into valid JSON only.",
-    "Preserve the question text, options, answerIndex, and explanation if they are present.",
-    "Do not add markdown, commentary, or code fences.",
-    'Return exactly this schema: {"questions":[{"question":"...","options":["...","...","...","..."],"answerIndex":0,"explanation":"...","translations":{"English":{"question":"...","options":["...","...","...","..."],"explanation":"..."},"Hindi":{"question":"...","options":["...","...","...","..."],"explanation":"..."},"Marathi":{"question":"...","options":["...","...","...","..."],"explanation":"..."}}]}',
-  ].join(" ");
-
-  const repairUserPrompt = [
-    `Topic: ${topic}`,
-    `Difficulty: ${difficulty}`,
-    `Target question count: ${count}`,
-    "Repair this output into valid JSON:",
-    raw.slice(0, 12000),
-  ].join("\n");
-
-  try {
-    const repairedRaw = await requestNvidiaBatch({
-      systemPrompt: repairSystemPrompt,
-      userPrompt: repairUserPrompt,
-      apiKey,
-      temperature: 0,
-      max_tokens: 6000,
-      top_p: 1,
-      timeoutMs: 4000,
-    });
-
-    return parseNvidiaQuestionBlock(repairedRaw);
-  } catch {
-    return null;
-  }
-}
-
-export async function generateMathQuestions({
-  topic,
-  difficulty,
-  count,
-  language = "English",
-  variationSeed,
-  blockedQuestionSignatures = [],
-}: GenerateQuestionParams): Promise<TopicQuestion[]> {
-  const apiKey = process.env.NVIDIA_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing NVIDIA_API_KEY environment variable.");
-  }
-
-  const blockedSignatures = new Set(
-    blockedQuestionSignatures
-      .filter((value): value is string => typeof value === "string")
-      .map((value: string) => value.trim())
-      .filter(Boolean),
-  );
-  const requestId = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
-
-  const safeCount = Math.min(Math.max(count, 1), 25);
-  const safeLanguage: "English" | "Hindi" | "Marathi" =
-    language === "Hindi" || language === "Marathi" ? language : "English";
-  const maxBatchSize = 4;
-  const maxAttempts = Math.max(10, Math.ceil(safeCount / maxBatchSize) + 10);
-  const totalBudgetMs = 120000;
-  const startedAtMs = Date.now();
-  const collected: TopicQuestion[] = [];
-  const dynamicBlockedSignatures = new Set(blockedSignatures);
-  let lastError: Error | null = null;
-
-  for (let attempt = 0; attempt < maxAttempts && collected.length < safeCount; attempt += 1) {
-    if (Date.now() - startedAtMs >= totalBudgetMs) {
-      break;
-    }
-
-    const remaining = safeCount - collected.length;
-    const batchCount = Math.min(maxBatchSize, remaining);
-    const batchRequestId = `${requestId}-${attempt + 1}`;
-
-    const systemPrompt = `You are a Math AI. Generate ${batchCount} UNIQUE MCQ questions for "${topic}" at "${difficulty}" level.
-RULES:
-1. Do not repeat these patterns: [${Array.from(dynamicBlockedSignatures).slice(-20).join(" | ")}].
-2. Use fresh wording and fresh numbers.
-3. Request ID for variation: ${batchRequestId}.
-4. Output only valid JSON.
-5. Write question, options, and explanation only in ${safeLanguage}.
-5a. If language is Hindi or Marathi, do not use any English words in question/explanation/options.
-5b. If the question involves money, use ₹ or Rs. and never use $.
-6. Options A, B, C, D must all be different values.
-7. Exactly one option must be correct, matching answerIndex.
-  Schema: {"questions": [{"question": "...", "options": ["A)...","B)...","C)...","D)..."], "answerIndex": 0, "explanation": "..."}]}`;
-
-    const userPrompt = `Generate exactly ${batchCount} fresh MCQ questions now for topic ${topic} at ${difficulty} level. Return valid JSON only. Use only ${safeLanguage}. If any question involves money, use ₹ or Rs. and never use $.`;
-
-    let raw = "";
-
-    try {
-      raw = await requestNvidiaBatch({
-        systemPrompt,
-        userPrompt,
-        apiKey,
-        temperature: 0.95,
-        max_tokens: 1400,
-        top_p: 0.9,
-        timeoutMs: 12000,
-      });
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error("Question generation failed.");
-      continue;
-    }
-
-    const parsed = parseNvidiaQuestionBlock(raw);
-    const resolvedParsed = parsed ?? await repairNvidiaQuestionBlock(raw, apiKey, topic, difficulty, batchCount);
-    if (!resolvedParsed) {
-      lastError = new Error("NVIDIA response was not valid JSON.");
-      continue;
-    }
-
-    const batchQuestions = normalizeGeneratedQuestions(
-      resolvedParsed.questions,
-      topic,
-      difficulty,
-      batchCount,
-      dynamicBlockedSignatures,
-      safeLanguage,
-    );
-
-    if (batchQuestions.length === 0) {
-      lastError = new Error("NVIDIA response did not contain any valid questions.");
-      continue;
-    }
-
-    let verifiedBatchQuestions = batchQuestions;
-    try {
-      verifiedBatchQuestions = await verifyQuestionChunkAccuracy(batchQuestions, apiKey, safeLanguage);
-    } catch {
-      // If verification fails, keep original generated batch.
-    }
-
-    for (const question of verifiedBatchQuestions) {
-      const signature = normalizeQuestionSignature(question.question);
-      dynamicBlockedSignatures.add(signature);
-      collected.push(question);
-      if (collected.length >= safeCount) {
-        break;
-      }
-    }
-  }
-
-  if (collected.length === 0) {
-    throw lastError ?? new Error("Question generation failed.");
-  }
-
-  if (collected.length < safeCount) {
-    console.warn(`Returning partial question set: ${collected.length}/${safeCount}`);
-  }
-
-  return attachAutoTranslations(collected, apiKey);
-}
-
-type GenerateMockQuestionsParams = {
-  count: number;
-  language?: string;
-  variationSeed?: number | string;
-  blockedQuestionSignatures?: string[];
-};
-
-function normalizeMockGeneratedQuestions(
-  questions: unknown,
-  count: number,
-  blockedSignatures: Set<string>,
-): MockQuestion[] {
-  if (!Array.isArray(questions)) {
-    return [];
-  }
-
-  const allowedTopics = new Set([
-    "number-patterns",
-    "percentage",
-    "profit-loss",
-    "simple-interest",
-    "work-time",
-    "linear-equations",
-  ]);
-  const normalized: MockQuestion[] = [];
-  const seenSignatures = new Set<string>();
-
-  for (const [index, item] of questions.entries()) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-
-    const record = item as Record<string, unknown>;
-    const topic = typeof record.topic === "string" ? record.topic.trim() : "";
-    const difficulty = record.difficulty === "easy" || record.difficulty === "medium" || record.difficulty === "hard"
-      ? record.difficulty
-      : "hard";
-    const question = typeof record.question === "string" ? record.question.trim() : "";
-    const explanation = typeof record.explanation === "string" ? record.explanation.trim() : "";
-    const answerIndex = typeof record.answerIndex === "number" ? record.answerIndex : -1;
-    const options = Array.isArray(record.options)
-      ? record.options.filter((value): value is string => typeof value === "string").map((value: string) => value.trim())
-      : [];
-
-    if (!allowedTopics.has(topic) || !question || !explanation || options.length !== 4 || answerIndex < 0 || answerIndex > 3) {
-      continue;
-    }
-
-    const signature = normalizeQuestionSignature(question);
-    if (seenSignatures.has(signature) || blockedSignatures.has(signature)) {
-      continue;
-    }
-
-    seenSignatures.add(signature);
-    normalized.push({
-      id: `mock-${topic}-${Date.now()}-${index}`,
-      topic,
-      topicTitle: typeof record.topicTitle === "string" && record.topicTitle.trim() ? record.topicTitle.trim() : getMockTopicTitle(topic),
-      difficulty,
-      question,
-      options: [options[0], options[1], options[2], options[3]],
-      answerIndex,
-      explanation,
-    });
-
-    if (normalized.length >= count) {
-      break;
-    }
-  }
-
-  return normalized;
-}
-
-export async function generateMixedMockQuestions({
-  count,
-  language = "English",
-  variationSeed,
-  blockedQuestionSignatures = [],
-}: GenerateMockQuestionsParams): Promise<MockQuestion[]> {
-  const apiKey = process.env.NVIDIA_API_KEY;
-
-  if (!apiKey) {
-    throw new Error("Missing NVIDIA_API_KEY environment variable.");
-  }
-
-  const safeCount = Math.min(Math.max(count, 1), 20);
-  const seedHash = Math.abs(parseInt(String(variationSeed ?? Date.now()).slice(-6), 10));
-  const requestId = seedHash % 100000;
-  const blockedSignatures = new Set(
-    blockedQuestionSignatures
-      .filter((value): value is string => typeof value === "string")
-      .map((value: string) => value.trim())
-      .filter(Boolean),
-  );
-
-  const systemPrompt = [
-    "You are a Math AI for NavGurukul mock tests.",
-    `Reply only in ${language}.`,
-    "Return only valid JSON and nothing else.",
-    'Schema: {"questions":[{"topic":"...","topicTitle":"...","difficulty":"medium|hard","question":"...","options":["A)...","B)...","C)...","D)..."],"answerIndex":0,"explanation":"..."}]}',
-    "Rules:",
-    "1. Every question must be unique and exam-like.",
-    "2. Use varied structures and realistic word problems.",
-    "3. Do not repeat the same template with only number changes.",
-    "4. All options must be plausible.",
-  ].join(" ");
-
-  const userPrompt = [
-    `Generate exactly ${count} mixed mock-test questions.`,
-    `Request ID: ${requestId}`,
-    `Do not repeat these patterns: [${buildBlockedPatternLine(blockedQuestionSignatures)}].`,
-    "Use these exact topic counts:",
-    "- number-patterns: 4 questions (2 medium, 2 hard)",
-    "- percentage: 4 questions (2 medium, 2 hard)",
-    "- profit-loss: 3 questions (1 medium, 2 hard)",
-    "- simple-interest: 3 questions (1 medium, 2 hard)",
-    "- work-time: 3 questions (1 medium, 2 hard)",
-    "- linear-equations: 3 questions (1 medium, 2 hard)",
-    "Mix the topics in the final output instead of grouping them together.",
-    "Keep the mock test challenging and exam-appropriate.",
-    "Every question must include topic, topicTitle, difficulty, question, options, answerIndex, and explanation.",
-    "Topic titles should be human-readable: Number Patterns, Percentage, Profit & Loss, Simple Interest, Work & Time, Linear Equations.",
-  ].join("\n");
-
-  const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "meta/llama-3.1-8b-instruct",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.95,
-      top_p: 0.92,
-      max_tokens: 3200,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    throw new Error(`NVIDIA API request failed: ${response.status} ${errorBody}`);
-  }
-
-  const data = await response.json();
-  const raw = String(data?.choices?.[0]?.message?.content ?? "");
-  const parsed = parseNvidiaQuestionBlock(raw);
-
-  if (!parsed) {
-    return [];
-  }
-
-  try {
-    return normalizeMockGeneratedQuestions(parsed.questions, safeCount, blockedSignatures);
-  } catch {
-    return [];
-  }
-}
-

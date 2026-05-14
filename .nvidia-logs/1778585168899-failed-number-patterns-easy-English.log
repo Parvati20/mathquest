@@ -1,0 +1,38 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:1078
+
+{
+ "questions":[
+  {
+   "question":"Find the next term in the sequence: 2, 6, 12, 20",
+   "options":["22","24","26","28"],
+   "answerIndex":2,
+   "explanation":"The pattern is adding 4, then 6, then 8, so the next difference is 10."
+  },
+  {
+   "question":"Find the missing term in the sequence: 1, 4, 9, 16, ?",
+   "options":["20","25","30","36"],
+   "answerIndex":2,
+   "explanation":"The pattern is squaring the numbers, so the next term is 25."
+  },
+  {
+   "question":"Find the next term in the sequence: 3, 6, 9, 12, 15",
+   "options":["18","20","22","24"],
+   "answerIndex":0,
+   "explanation":"The pattern is adding 3 each time."
+  },
+  {
+   "question":"Find the missing term in the sequence: 2, 6, 12, 20, 30, ?",
+   "options":["42","44","46","48"],
+   "answerIndex":3,
+   "explanation":"The pattern is adding 4, then 6, then 8, then 10, so the next difference is 12."
+  },
+  {
+   "question":"Find the next term in the sequence: 1, 2, 4, 8, 16",
+   "options":["32","36","40","42"],
+   "answerIndex":0,
+   "explanation":"The pattern is doubling the previous term."
+  }
+ ]

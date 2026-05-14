@@ -30,13 +30,14 @@ export async function POST(request: Request) {
       : [];
     const correctAnswer = typeof body.correctAnswer === "string" ? body.correctAnswer.trim() : "";
     const baseExplanation = typeof body.baseExplanation === "string" ? body.baseExplanation.trim() : "";
-    const language = typeof body.language === "string" && body.language.trim() ? body.language.trim() : "Hindi";
+    const language = typeof body.language === "string" && body.language.trim() ? body.language.trim() : "English";
 
-    if (!topic || !question || !correctAnswer || options.length === 0 || !baseExplanation) {
-      return NextResponse.json(
-        { error: "Topic, question, options, correctAnswer and baseExplanation are required." },
-        { status: 400 },
-      );
+    if (!topic || !question || !correctAnswer || options.length === 0) {
+      return NextResponse.json({
+        explanation:
+          baseExplanation ||
+          (correctAnswer ? `Final Answer: ${correctAnswer}` : "Explanation unavailable right now."),
+      });
     }
 
     const explanation = await getMathExplanation(topic, question, options, correctAnswer, baseExplanation, language);

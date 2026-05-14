@@ -1,3 +1,5 @@
+
+
 "use client";
 
 import Link from "next/link";
@@ -5,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import BrandLogo from "@/components/BrandLogo";
 import LanguageSelect from "@/components/LanguageSelect";
 import { useLanguage } from "@/components/LanguageProvider";
-import { getLocalizedDifficultyLabel, getLocalizedQuestion, getLocalizedTopicContent, getUiText } from "@/lib/language";
+import { getLocalizedDifficultyLabel, getLocalizedTopicContent, getUiText } from "@/lib/language";
 import { topicsData } from "@/lib/topicsData";
 import type { Difficulty, TopicQuestion } from "@/lib/questionsData";
 
@@ -43,6 +45,24 @@ function getMoveToNextLabel(nextDifficulty: Difficulty, language: string) {
 
 function normalizeQuestionSignature(question: string) {
   return question.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+function getCleanQuestionStem(question: string) {
+  const normalized = question.replace(/\s+/g, " ").trim();
+  const optionPattern = /(?:^|\s)(?:A|B|C|D)[\)\.:]\s*/gi;
+  const matches = Array.from(normalized.matchAll(optionPattern));
+
+  if (matches.length > 0) {
+    const firstMarker = matches[0];
+    if (firstMarker.index !== undefined && firstMarker.index > 0) {
+      return normalized.slice(0, firstMarker.index).trim();
+    }
+  }
+
+  return normalized
+    .replace(/\s*[A-D][\)\.:]\s*.*$/i, "")
+    .replace(/\s*\d+[\)\.:]\s*.*$/i, "")
+    .trim();
 }
 
 function getHistoryStorageKey(topic: string, difficulty: Difficulty) {
@@ -121,7 +141,8 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
   const sessionQuestions = generatedSession ?? [];
   const currentQuestion = sessionQuestions[index];
   const localizedTopic = getLocalizedTopicContent(topic as keyof typeof topicsData, language);
-  const localizedCurrentQuestion = currentQuestion ? getLocalizedQuestion(currentQuestion, language) : null;
+  const data = currentQuestion;
+  const displayQuestion = getCleanQuestionStem(data?.question ?? currentQuestion?.question ?? "");
 
   const storageSeedKey = useMemo(() => `mathquest-practice-seed:${topic}:${difficulty}`, [topic, difficulty]);
   const difficultyLanguageKey = `${difficulty}:${language}`;
@@ -206,8 +227,11 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     const seed = seedOverride ?? sessionSeed;
     const requestKey = `${topic}:${difficulty}:${language}:${seed}`;
 
+    console.log(`🔍 fetchGeneratedSession: key=${requestKey}, language=${language}`);
+
     const cachedSession = practiceGenerationCache.get(requestKey);
     if (cachedSession) {
+      console.log(`✅ Found in practiceGenerationCache`);
       if (mountedRef.current) {
         setGeneratedSession(cachedSession);
         setGenerationError(null);
@@ -219,10 +243,12 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
 
     const inFlightSession = practiceGenerationInFlight.get(requestKey);
     if (inFlightSession) {
+      console.log(`⏳ Request in flight for this key`);
       return inFlightSession;
     }
 
     if (seedOverride === undefined && cachedSessions[difficultyLanguageKey]?.length) {
+      console.log(`✅ Found in cachedSessions with key=${difficultyLanguageKey}`);
       if (mountedRef.current) {
         setGeneratedSession(cachedSessions[difficultyLanguageKey] ?? null);
         setGenerationError(null);
@@ -232,6 +258,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
       return cachedSessions[difficultyLanguageKey] ?? [];
     }
 
+    console.log(`📥 Fetching fresh questions from API...`);
     setIsGeneratingSession(true);
     setGenerationError(null);
 
@@ -242,11 +269,14 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
         const generated = await requestGeneratedQuestions(difficulty, seed, controller.signal);
         clearTimeout(timeout);
 
+        console.log(`📦 Got ${generated.length} questions from API`);
+
         if (!mountedRef.current) {
           return generated;
         }
 
         if (generated.length > 0) {
+          console.log(`💾 Caching under key=${requestKey}`);
           practiceGenerationCache.set(requestKey, generated);
           setGeneratedSession(generated);
           setCachedSessions((prev) => ({ ...prev, [difficultyLanguageKey]: generated }));
@@ -409,12 +439,12 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
       setCurrentStreak(0);
       setWrongCount((prev) => prev + 1);
       const fallbackOptions = currentQuestion.options;
-      const localizedOptions = localizedCurrentQuestion?.options ?? fallbackOptions;
+      const localizedOptions = data?.options ?? fallbackOptions;
       const correctAnswer = localizedOptions[currentQuestion.answerIndex] ?? String(fallbackOptions[currentQuestion.answerIndex] ?? "");
-      const baseExplanation = localizedCurrentQuestion?.explanation ?? currentQuestion.explanation ?? "";
+      const baseExplanation = data?.explanation ?? currentQuestion.explanation ?? "";
 
       void requestAiExplanation(
-        localizedCurrentQuestion?.question ?? currentQuestion.question,
+        displayQuestion || (data?.question ?? currentQuestion.question),
         localizedOptions,
         correctAnswer,
         baseExplanation,
@@ -677,10 +707,10 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
 
               <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-pink-300/50 to-transparent" />
 
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight text-gray-800">{localizedCurrentQuestion?.question}</h2>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-black leading-tight text-gray-800">{displayQuestion || data.question}</h2>
 
               <div className="mt-6 space-y-3">
-                {localizedCurrentQuestion?.options.map((option, optionIndex) => {
+                {(data.options || []).map((option, optionIndex) => {
               const optionLetter = String.fromCharCode(65 + optionIndex);
               const isPicked = selectedIndex === optionIndex;
               const showCorrect = submitted && optionIndex === currentQuestion.answerIndex;
@@ -759,9 +789,7 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
 
             <div className="mt-4 flex items-center justify-between gap-3 rounded-xl">
               <p className={`text-xs sm:text-sm font-semibold ${submitted ? (isCorrect ? "text-emerald-600" : "text-red-500") : "text-gray-600"}`}>
-              {submitted
-                ? `${isCorrect ? text.correctFeedback : text.incorrect} ${localizedCurrentQuestion?.explanation ?? ""}`
-                : text.chooseOption}
+                {submitted ? `${isCorrect ? text.correctFeedback : text.incorrect} ${data?.explanation ?? ""}` : text.chooseOption}
               </p>
 
               <button
@@ -800,7 +828,4 @@ export default function TopicPracticeClient({ topic }: TopicPracticeClientProps)
     </main>
   );
 }
-
-
-
 

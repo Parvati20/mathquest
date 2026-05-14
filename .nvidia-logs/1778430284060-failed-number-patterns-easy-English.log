@@ -1,0 +1,75 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:2468
+
+{
+ "questions":[
+  {
+   "question":"Find the next number in the pattern: 1, 2, 4, 8, 16, ?",
+   "options":["32","64","128","256"],
+   "answerIndex":3,
+   "explanation":"This is a geometric sequence with a common ratio of 2."
+  },
+  {
+   "question":"Find the next number in the pattern: 2, 5, 8, 11, 14, ?",
+   "options":["17","18","19","20"],
+   "answerIndex":1,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 3, 6, 9, 12, 15, ?",
+   "options":["18","19","20","21"],
+   "answerIndex":0,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 4, 7, 10, 13, 16, ?",
+   "options":["19","20","21","22"],
+   "answerIndex":0,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 1, 4, 9, 16, 25, ?",
+   "options":["36","49","64","81"],
+   "answerIndex":2,
+   "explanation":"This is a sequence of square numbers."
+  },
+  {
+   "question":"Find the next number in the pattern: 2, 6, 12, 20, 30, ?",
+   "options":["42","48","54","60"],
+   "answerIndex":2,
+   "explanation":"This is an arithmetic sequence with a common difference of 4."
+  },
+  {
+   "question":"Find the next number in the pattern: 3, 6, 9, 12, 15, ?",
+   "options":["18","19","20","21"],
+   "answerIndex":0,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 4, 7, 10, 13, 16, ?",
+   "options":["19","20","21","22"],
+   "answerIndex":0,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 1, 2, 4, 8, 16, ?",
+   "options":["32","64","128","256"],
+   "answerIndex":3,
+   "explanation":"This is a geometric sequence with a common ratio of 2."
+  },
+  {
+   "question":"Find the next number in the pattern: 2, 5, 8, 11, 14, ?",
+   "options":["17","18","19","20"],
+   "answerIndex":1,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 3, 6, 9, 12, 15, ?",
+   "options":["18","19","20","21"],
+   "answerIndex":0,
+   "explanation":"This is an arithmetic sequence with a common difference of 3."
+  },
+  {
+   "question":"Find the next number in the pattern: 4, 7, 10, 13, 16, ?

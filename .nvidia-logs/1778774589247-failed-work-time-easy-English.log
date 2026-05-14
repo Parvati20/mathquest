@@ -1,0 +1,40 @@
+topic:work-time
+difficulty:easy
+language:English
+rawLength:2682
+
+{
+  "questions": [
+    {
+      "question": "If a worker completes 3/4 of a job in 6 hours, how many hours will it take to complete the entire job?",
+      "options": ["8", "10", "12", "14"],
+      "answerIndex": 1,
+      "explanation": "Since the worker completes 3/4 of the job in 6 hours, to find the total time to complete the job, we can set up a proportion. If 3/4 of the job takes 6 hours, then the whole job will take (6 * 4) / 3 hours, which is 8 hours."
+    },
+    {
+      "question": "A person can finish a task in 5 hours. If they work for 2 hours and then take a break, how many hours will it take to finish the remaining work?",
+      "options": ["2", "3", "4", "5"],
+      "answerIndex": 2,
+      "explanation": "Since the person can finish the task in 5 hours, they have completed 2/5 of the work in 2 hours. The remaining work is 3/5, which can be calculated using the concept of work done. If 2 hours are needed to complete 2/5 of the work, then 3/5 of the work will take (3/2) * 2 hours, which is 3 hours."
+    },
+    {
+      "question": "If a worker can complete 1/3 of a job in 2 hours, how many hours will it take to complete 2/3 of the job?",
+      "options": ["2", "4", "6", "8"],
+      "answerIndex": 1,
+      "explanation": "Since the worker completes 1/3 of the job in 2 hours, to find the time to complete 2/3 of the job, we can use the concept of work done. If 1/3 of the job takes 2 hours, then 2/3 of the job will take (2 * 2) hours, which is 4 hours."
+    },
+    {
+      "question": "A person can finish a task in 4 hours. If they work for 1 hour and then take a break, how many hours will it take to finish the remaining work?",
+      "options": ["1", "2", "3", "4"],
+      "answerIndex": 2,
+      "explanation": "Since the person can finish the task in 4 hours, they have completed 1/4 of the work in 1 hour. The remaining work is 3/4, which can be calculated using the concept of work done. If 1 hour is needed to complete 1/4 of the work, then 3/4 of the work will take (3/1) * 1 hour, which is 3 hours."
+    },
+    {
+      "question": "If a worker completes 2/3 of a job in 4 hours, how many hours will it take to complete the entire job?",
+      "options": ["6", "8", "10", "12"],
+      "answerIndex": 0,
+      "explanation": "Since the worker completes 2/3 of the job in 4 hours, to find the total time to complete the job, we can set up a proportion. If 2/3 of the job takes 4 hours, then the whole job will take (4 * 3) / 2 hours, which is 6 hours."
+    },
+    {
+      "question": "A person can finish a task in 3 hours. If they work for 1 hour and then take a break, how many hours will it take to finish the remaining work?",
+      "options

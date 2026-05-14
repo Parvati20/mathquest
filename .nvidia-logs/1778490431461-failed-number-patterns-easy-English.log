@@ -1,0 +1,12 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:2302
+
+{
+ "questions":[
+  {
+   "question":"A snail is at the bottom of a 20-foot well. Each day, it climbs up 3 feet, but at night, it slips back 2 feet. How many days will it take for the snail to reach the top of the well?",
+   "options":["5 days","6 days","7 days","8 days"],
+   "answerIndex":2,
+   "explanation":"The snail climbs 3 feet and slips back 2 feet, effectively moving 1 foot up the well each day. It needs to climb 20 feet, so it will take 20 days to reach the top, but on the 20th day, it will climb 3 feet and reach the top, so it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take 19 days to climb 19 feet and 1 day to climb the last 1 foot, making it 20 days in total, but since it climbs 3 feet on the 20th day, it will take

@@ -1,3 +1,8 @@
+
+
+
+
+
 import { MongoClient } from "mongodb";
 
 const srvUri = process.env.MONGODB_URI;
@@ -72,8 +77,3 @@ export function getMongoClient() {
 
   return retryablePromise;
 }
-
-
-
-
-

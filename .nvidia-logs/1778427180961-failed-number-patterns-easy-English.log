@@ -1,0 +1,36 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:2815
+
+{
+ "questions":[
+  {
+   "question":"A snail is at the bottom of a 20-step staircase. Each day, it climbs up 3 steps, but at night, it slips back 2 steps. How many days will it take for the snail to reach the top of the staircase?",
+   "options":["10 days","12 days","15 days","20 days"],
+   "answerIndex":2,
+   "explanation":"The snail climbs 3 steps and slips back 2 steps each day, so it effectively climbs 1 step each day. To reach the top of the staircase, it will take 18 days (20 - 2 = 18). However, the snail will reach the top on the 19th day, as it will climb 3 steps on the 19th day and reach the top."
+  },
+  {
+   "question":"A bakery sells a total of 480 loaves of bread in a day. They sell a combination of whole wheat and white bread. If the ratio of whole wheat to white bread is 3:5, how many loaves of whole wheat bread were sold?",
+   "options":["144 loaves","160 loaves","192 loaves","240 loaves"],
+   "answerIndex":2,
+   "explanation":"Let's say the number of whole wheat loaves is 3x and the number of white bread loaves is 5x. We know that 3x + 5x = 480. Combining like terms, we get 8x = 480. Dividing both sides by 8, we get x = 60. So, the number of whole wheat loaves is 3x = 3(60) = 180. The number of white bread loaves is 5x = 5(60) = 300. Therefore, the bakery sold 180 loaves of whole wheat bread."
+  },
+  {
+   "question":"A group of friends want to share some money equally. If they have $240 and there are 8 friends, but one friend is absent, how much money will each of the remaining friends get?",
+   "options":["$25","$30","$35","$40"],
+   "answerIndex":3,
+   "explanation":"Since one friend is absent, there are 7 friends remaining. To find out how much each friend will get, we divide the total amount of money by the number of friends. 240 ÷ 7 = 34.29 (rounded to two decimal places). So, each of the remaining friends will get approximately $34.29."
+  },
+  {
+   "question":"A car travels from city A to city B at an average speed of 60 km/h. On the return trip, the car travels at an average speed of 40 km/h. If the distance between the two cities is 240 km, how long does the return trip take?",
+   "options":["4 hours","5 hours","6 hours","8 hours"],
+   "answerIndex":1,
+   "explanation":"The distance between the two cities is 240 km. To find the time it takes to travel at an average speed of 40 km/h, we divide the distance by the speed. 240 ÷ 40 = 6 hours."
+  },
+  {
+   "question":"A water tank can fill 3 buckets in 8 minutes. How long will it take to fill 2 buckets?",
+   "options":["4 minutes","6 minutes","8 minutes","10 minutes"],
+   "answerIndex":2,
+   "explanation":"The water tank can fill 3 buckets in 8 minutes. To find out how long it will take to fill 2 buckets, we divide the time it takes to fill 3 buckets by 3. Then, we multiply the result by 2. (8 ÷ 3

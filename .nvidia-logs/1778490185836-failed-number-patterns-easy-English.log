@@ -1,0 +1,24 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:2596
+
+{
+ "questions":[
+  {
+   "question":"A snail is at the bottom of a 20-foot well. Each day, it climbs up 3 feet, but at night, it slips back 2 feet. How many days will it take for the snail to reach the top of the well?",
+   "options":["5 days","6 days","7 days","8 days"],
+   "answerIndex":2,
+   "explanation":"The snail climbs 3 feet and slips back 2 feet, effectively moving 1 foot up the well each day. It needs to move 20 feet, so it will take 20 days, but since it climbs 3 feet on the last day and reaches the top, it takes 20 days - 1 day = 19 days to climb 18 feet, and 1 day to climb the last 2 feet. However, the question asks for the number of days it takes to reach the top, which is 20 days. However, the correct answer is 7 days because the question asks for the number of days it takes to reach the top, not the number of days it takes to climb 18 feet."
+  },
+  {
+   "question":"A bakery sells a total of 250 loaves of bread per day. They sell a combination of whole wheat and white bread. If they sell 10 more whole wheat loaves than white bread loaves, and they sell a total of 120 whole wheat loaves, how many white bread loaves do they sell?",
+   "options":["70","80","90","100"],
+   "answerIndex":0,
+   "explanation":"Let's say the number of white bread loaves is x. Then, the number of whole wheat loaves is x + 10. We know that x + (x + 10) = 250. Simplifying the equation, we get 2x + 10 = 250. Subtracting 10 from both sides, we get 2x = 240. Dividing both sides by 2, we get x = 120. However, this is the number of whole wheat loaves, not the number of white bread loaves. Since the bakery sells 10 more whole wheat loaves than white bread loaves, the number of white bread loaves is 120 - 10 = 110. However, the question asks for the number of white bread loaves, not the difference between the number of whole wheat loaves and white bread loaves. Since the bakery sells a total of 120 whole wheat loaves, and they sell 10 more whole wheat loaves than white bread loaves, the number of white bread loaves is 120 - 10 = 110. However, the correct answer is 70 because the question asks for the number of white bread loaves, not the difference between the number of whole wheat loaves and white bread loaves."
+  },
+  {
+   "question":"A group of friends want to split a bill evenly. If they each pay $15 more than the person who pays the least, and the person who pays the least pays $25, how much will the person who pays the least pay?",
+   "options":["$20","$25","$30","$35"],
+   "answerIndex":2,
+   "explanation":"Let's say the person who pays the least pays x. Then, the

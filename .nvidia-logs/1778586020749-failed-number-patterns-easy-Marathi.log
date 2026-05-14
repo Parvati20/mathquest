@@ -1,0 +1,20 @@
+topic:number-patterns
+difficulty:easy
+language:Marathi
+rawLength:391
+
+{
+ "questions":[
+  {
+   "question":"पुढील संख्या कोणती: 2, 6, 12, 20, ?",
+   "options":["26", "30", "28", "32"],
+   "answerIndex":1,
+   "explanation":"फरक 4, 6, 8 आहे। अगली संख्या 20 + 8 = 28 आहे।"
+  },
+  {
+   "question":"पुढील संख्या कोणती: 5, 10, 15, 20, ?",
+   "options":["25", "30", "35", "40"],
+   "answerIndex":1,
+   "explanation":"फरक 5, 5, 5 आहे। अगली संख्या 20 + 5 = 25 आहे।"
+  }
+ ]

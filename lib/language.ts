@@ -345,6 +345,14 @@ export function getLocalizedQuestion<T extends {
   }
 
   const translated = question.translations?.[language];
+  
+  if (typeof window !== "undefined") {
+    console.log(`🌐 getLocalizedQuestion: language=${language}, hasTranslations=${!!question.translations}, hasTranslatedField=${!!translated}`);
+    if (translated) {
+      console.log(`  ✅ Found ${language} translation: "${translated.question?.substring(0, 40)}..."`);
+    }
+  }
+
   if (!translated) {
     if (language === "English") {
       return question;
