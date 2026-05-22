@@ -1,0 +1,45 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:1931
+
+{
+  "questions": [
+    {
+      "question": "Find the next term in the sequence: 4, 12, 24, 40, ?",
+      "options": ["52", "48", "56", "60"],
+      "answerIndex": 1,
+      "explanation": "यह geometric pattern है क्योंकि प्रत्येक पैला पिछले पैला के 3 गुना है। अगला पैला 40 के 3 गुना होगा, जो 120 है।"
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 5, 8, 11, 14, ?",
+      "options": ["17", "18", "19", "21"],
+      "answerIndex": 2,
+      "explanation": "यह arithmetic pattern है क्योंकि प्रत्येक पैला पिछले पैला से 3 जोड़ता है। अगला पैला 14 से 3 जोड़ता होगा, जो 17 है।"
+    },
+    {
+      "question": "Find the next term in the sequence: 1, 4, 9, 16, 25, ?",
+      "options": ["36", "32", "40", "48"],
+      "answerIndex": 0,
+      "explanation": "यह quadratic pattern है क्योंकि प्रत्येक पैला पिछले पैला से 3 जोड़ता है और फिर 2 जोड़ता है। अगला पैला 25 से 3 जोड़ता होगा, जो 28 है, और फिर 2 जोड़ता होगा, जो 30 है।"
+    },
+    {
+      "question": "Find the next term in the sequence: 3, 6, 12, 24, 48, ?",
+      "options": ["96", "100", "104", "108"],
+      "answerIndex": 1,
+      "explanation": "यह geometric pattern है क्योंकि प्रत्येक पैला पिछले पैला के 2 गुना है। अगला पैला 48 के 2 गुना होगा, जो 96 है।"
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 6, 12, 20, 30, ?",
+      "options": ["42", "40", "38", "36"],
+      "answerIndex": 0,
+      "explanation": "यह quadratic pattern है क्योंकि प्रत्येक पैला पिछले पैला से 4 जोड़ता है और फिर 2 जोड़ता है। अगला पैला 30 से 4 जोड़ता होगा, जो 34 है, और फिर 2 जोड़ता होगा, जो 36 है।"
+    },
+    {
+      "question": "Find the next term in the sequence: 5, 15, 35, 75, 155, ?",
+      "options": ["311", "315", "319", "323"],
+      "answerIndex": 2,
+      "explanation": "यह geometric pattern है क्योंकि प्रत्येक पैला पिछले पैला के 3 गुना है। अगला पैला 155 के 3 गुना होगा, जो 465 है।"
+    },
+    {
+      "question": "Find the next term in the

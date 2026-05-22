@@ -1,0 +1,42 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:2682
+
+{
+  "questions": [
+    {
+      "question": "Find the next term in the sequence: 3, 6, 9, 12, ?",
+      "options": ["15", "18", "20", "22"],
+      "answerIndex": 1,
+      "explanation": "This is an arithmetic progression because the difference between consecutive terms is constant (3, 6, 9, 12). The next difference will be 15, so the next term is 12 + 15 = 27, but 27 is not in the options. However, the options are close to the correct answer. To find the correct answer, we need to find the common difference, which is 3. Then, we add 3 to 12 to get the next term, which is 15."
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 6, 18, 54, ?",
+      "options": ["162", "108", "90", "72"],
+      "answerIndex": 0,
+      "explanation": "This is a geometric progression because the ratio between consecutive terms is constant (3, 6, 18, 54). To find the next term, we multiply the last term by the common ratio, which is 3. So, the next term is 54 * 3 = 162."
+    },
+    {
+      "question": "Find the next term in the sequence: 1, 4, 9, 16, ?",
+      "options": ["25", "27", "29", "31"],
+      "answerIndex": 0,
+      "explanation": "This is a quadratic pattern because the differences between consecutive terms are increasing by 3 each time (3, 5, 7). To find the next difference, we add 3 to the last difference, which is 7. So, the next difference is 10. Then, we add 10 to the last term, which is 16, to get the next term, which is 26, but 26 is not in the options. However, the options are close to the correct answer. To find the correct answer, we need to find the pattern in the differences, which is increasing by 3 each time. Then, we add 10 to 16 to get the next term, which is 26."
+    },
+    {
+      "question": "Find the next term in the sequence: 5, 10, 20, 40, ?",
+      "options": ["80", "60", "50", "40"],
+      "answerIndex": 0,
+      "explanation": "This is a geometric progression because the ratio between consecutive terms is constant (2, 2, 2). To find the next term, we multiply the last term by the common ratio, which is 2. So, the next term is 40 * 2 = 80."
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 5, 8, 11, ?",
+      "options": ["14", "16", "18", "20"],
+      "answerIndex": 0,
+      "explanation": "This is an arithmetic progression because the difference between consecutive terms is constant (3, 3, 3). To find the next term, we add the common difference to the last term, which is 11. So, the next term is 11 + 3 = 14."
+    },
+    {
+      "question": "Find the next term in the sequence: 3, 9, 27, 81, ?",
+      "options": ["243", "243", "243", "243"],
+      "answerIndex": 0,
+      "explanation":

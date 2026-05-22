@@ -354,7 +354,31 @@ async function generateBatch(
   // Build topic-specific examples with DO's and DON'Ts for conceptual learning
   let topicGuidance = "";
   if (topic === "number-patterns") {
-    topicGuidance = `TOPIC: Number Patterns & Sequences
+    if (language === "English") {
+      topicGuidance = `TOPIC: Number Patterns & Sequences
+CONCEPTS TO MASTER:
+- Arithmetic Progressions: constant difference between consecutive terms
+- Geometric Progressions: constant ratio between consecutive terms  
+- Quadratic/Compound Patterns: difference of differences changes
+- Mixed Patterns: combination of different rules
+
+EXAMPLE QUESTION (to understand concept, NOT to memorize format):
+"Find the next term in the sequence: 2, 6, 12, 20, ?"
+Explanation: This is a quadratic pattern because the differences are 4, 6, 8. The next difference is 10, so the next term is 30.
+
+DO's:
+✓ Practice identifying CONCEPTS: Is difference constant? Is there a ratio? Are differences changing?
+✓ Generate VARIOUS FORMATS of same concept
+✓ Mix different pattern types in questions
+
+DON'Ts:
+✗ Do NOT memorize specific question formats
+✗ Do NOT expect all questions to follow the exact example structure
+✗ Do NOT assume you know which patterns will appear
+
+GENERATION RULE: Create diverse questions using arithmetic, geometric, or compound patterns. Options must be 4 distinct numbers.`;
+    } else {
+      topicGuidance = `TOPIC: Number Patterns & Sequences
 CONCEPTS TO MASTER:
 - Arithmetic Progressions: constant difference between consecutive terms
 - Geometric Progressions: constant ratio between consecutive terms  
@@ -376,8 +400,33 @@ DON'Ts:
 ✗ Do NOT assume you know which patterns will appear
 
 GENERATION RULE: Create diverse questions using arithmetic, geometric, or compound patterns. Options must be 4 distinct numbers.`;
+    }
   } else if (topic === "percentage") {
-    topicGuidance = `TOPIC: Percentage Calculations
+    if (language === "English") {
+      topicGuidance = `TOPIC: Percentage Calculations
+CONCEPTS TO MASTER:
+- Finding percentage of a number: (percentage/100) × number
+- Finding what percentage one value is of another
+- Percentage increase/decrease applications
+- Real-world percentage problems
+
+EXAMPLE QUESTION (to understand concept, NOT to memorize format):
+"What is 20% of 150?"
+Explanation: 20% of 150 = (20/100) × 150 = 30. This is the basic percentage concept.
+
+DO's:
+✓ Understand the FORMULA: (P/100) × Value = Result
+✓ Practice various number combinations
+✓ Learn to identify percentage scenarios in real life
+
+DON'Ts:
+✗ Do NOT memorize the exact question format shown
+✗ Do NOT expect all questions to ask "What is X% of Y?"
+✗ Do NOT assume you know which numbers will appear
+
+GENERATION RULE: Create varied percentage questions using different numbers and scenarios. Options must be 4 DISTINCT INTEGER answers (NO decimals like 30.0 or 30.00).`;
+    } else {
+      topicGuidance = `TOPIC: Percentage Calculations
 CONCEPTS TO MASTER:
 - Finding percentage of a number: (percentage/100) × number
 - Finding what percentage one value is of another
@@ -399,6 +448,7 @@ DON'Ts:
 ✗ Do NOT assume you know which numbers will appear
 
 GENERATION RULE: Create varied percentage questions using different numbers and scenarios. Options must be 4 DISTINCT INTEGER answers (NO decimals like 30.0 or 30.00).`;
+    }
   } else {
     topicGuidance = `Generate questions specifically for the topic: ${topic}.
 Focus on conceptual understanding, not memorizing patterns.

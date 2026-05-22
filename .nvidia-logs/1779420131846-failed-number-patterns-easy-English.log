@@ -1,0 +1,41 @@
+topic:number-patterns
+difficulty:easy
+language:English
+rawLength:1919
+
+{
+  "questions": [
+    {
+      "question": "Find the next term in the sequence: 4, 8, 12, 16, ?",
+      "options": ["20", "22", "24", "26"],
+      "answerIndex": 0,
+      "explanation": "यह geometric pattern है क्योंकि प्रत्येक पैला पिछले पैला के साथ समान अनुपात में है। यहाँ, प्रत्येक पैला पिछले पैला से 4 से अधिक होता है, इसलिए अगला पैला 16 + 4 = 20 होगा।"
+    },
+    {
+      "question": "Find the next term in the sequence: 3, 6, 9, 12, ?",
+      "options": ["15", "18", "21", "24"],
+      "answerIndex": 2,
+      "explanation": "यह arithmetic pattern है क्योंकि प्रत्येक पैला पिछले पैला से 3 से अधिक होता है। यहाँ, प्रत्येक पैला पिछले पैला से 3 से अधिक होता है, इसलिए अगला पैला 12 + 3 = 15 नहीं है, बल्कि 12 + 9 = 21 होगा।"
+    },
+    {
+      "question": "Find the next term in the sequence: 1, 4, 9, 16, ?",
+      "options": ["25", "27", "29", "31"],
+      "answerIndex": 0,
+      "explanation": "यह quadratic pattern है क्योंकि प्रत्येक पैला पिछले पैला से व्युत्क्रम समान होता है। यहाँ, प्रत्येक पैला पिछले पैला से 3 से अधिक होता है, इसलिए अगला पैला 16 + 9 = 25 होगा।"
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 6, 12, 20, ?",
+      "options": ["30", "28", "32", "34"],
+      "answerIndex": 0,
+      "explanation": "यह quadratic pattern है क्योंकि प्रत्येक पैला पिछले पैला से व्युत्क्रम समान होता है। यहाँ, प्रत्येक पैला पिछले पैला से 4 से अधिक होता है, इसलिए अगला पैला 20 + 10 = 30 होगा।"
+    },
+    {
+      "question": "Find the next term in the sequence: 5, 10, 15, 20, ?",
+      "options": ["25", "27", "29", "31"],
+      "answerIndex": 0,
+      "explanation": "यह arithmetic pattern है क्योंकि प्रत्येक पैला पिछले पैला से 5 से अधिक होता है। यहाँ, प्रत्येक पैला पिछले पैला से 5 से अधिक होता है, इसलिए अगला पैला 20 + 5 = 25 होगा।"
+    },
+    {
+      "question": "Find the next term in the sequence: 2, 6, 12, 20, ?",
+      "options": ["30", "28", "32", "34"],
+      "answerIndex": 0
