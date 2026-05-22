@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { generateMixedMockQuestions } from "@/lib/nvidia";
 import { normalizeSeed } from "@/lib/mockSession";
 
 async function readJsonBody(request: Request) {
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
 
     for (let attempt = 0; attempt < 3 && collected.length < count; attempt += 1) {
       const pending = count - collected.length;
-      const generated = await generateFastQuestions({
+      const generated = await generateMixedMockQuestions({
         count: pending,
         language,
         variationSeed: `${variationSeed ?? Date.now()}-${attempt + 1}`,

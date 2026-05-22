@@ -671,6 +671,36 @@ export async function generateFastQuestions({
   return finalQuestions;
 }
 
+// Lightweight compatibility wrapper used by mock-test route.
+// Historically `generateMixedMockQuestions` existed with a different signature.
+// To avoid wide refactors, provide a small wrapper that forwards to
+// `generateFastQuestions` with a sensible default topic/difficulty.
+export async function generateMixedMockQuestions({
+  count,
+  language = "English",
+  variationSeed: _variationSeed,
+  blockedQuestionSignatures = [],
+}: {
+  count: number;
+  language?: string;
+  variationSeed?: string | number;
+  blockedQuestionSignatures?: string[];
+}) {
+  const topic = "number-patterns";
+  const difficulty = "easy";
+  // variationSeed is currently ignored by the underlying generator.
+  void _variationSeed;
+  const questions = await generateFastQuestions({
+    topic,
+    difficulty,
+    count,
+    language,
+    blockedQuestionSignatures,
+  });
+
+  return questions;
+}
+
 export async function getMathExplanation(
   topic: string,
   question: string,
